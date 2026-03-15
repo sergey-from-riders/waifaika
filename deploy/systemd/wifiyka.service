@@ -1,0 +1,19 @@
+[Unit]
+Description=Wifiyka Wi-Fi map backend
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=hellor8g
+Group=hellor8g
+WorkingDirectory=/var/www/sergey/wifiyka/current
+EnvironmentFile=/var/www/sergey/wifiyka/current/deploy/.env
+ExecStart=/var/www/sergey/wifiyka/current/dist/wifiyka-server
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/www/sergey/wifiyka/shared/logs/app.log
+StandardError=append:/var/www/sergey/wifiyka/shared/logs/app.error.log
+
+[Install]
+WantedBy=multi-user.target

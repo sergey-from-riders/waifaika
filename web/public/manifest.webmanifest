@@ -1,0 +1,26 @@
+{
+  "name": "Вайфайка",
+  "short_name": "Вайфайка",
+  "description": "PWA-карта бесплатных Wi-Fi точек с офлайн-кэшем, анонимным стартом и magic link для привязки email.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F8FBFF",
+  "theme_color": "#2563EB",
+  "lang": "ru",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

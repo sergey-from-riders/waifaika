@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Manrope, "Avenir Next", "Segoe UI", sans-serif;
+  color: #0f172a;
+  background: #f4f7fb;
+  --app-bg: #f4f7fb;
+  --app-fg: #0f172a;
+  --app-muted: #49586c;
+  --map-bg: #edf2f8;
+  --panel-solid: rgba(255, 255, 255, 0.96);
+  --panel-muted: rgba(15, 23, 42, 0.06);
+  --panel-border: rgba(71, 85, 105, 0.18);
+  --sheet-bg: rgba(255, 255, 255, 0.985);
+  --shadow-float: 0 18px 45px rgba(15, 23, 42, 0.1);
+  --sheet-shadow: 0 -24px 60px rgba(15, 23, 42, 0.18);
+}
+
+:root[data-theme="dark"] {
+  color: #f5f7fb;
+  background: #05070b;
+  --app-bg: #05070b;
+  --app-fg: #f5f7fb;
+  --app-muted: #b2bccb;
+  --map-bg: #05070b;
+  --panel-solid: rgba(11, 15, 22, 0.96);
+  --panel-muted: rgba(255, 255, 255, 0.08);
+  --panel-border: rgba(203, 213, 225, 0.16);
+  --sheet-bg: rgba(8, 12, 18, 0.985);
+  --shadow-float: none;
+  --sheet-shadow: none;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--app-fg);
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.glass-panel {
+  backdrop-filter: blur(18px);
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow-float);
+}
+
+.sheet-shadow {
+  box-shadow: var(--sheet-shadow);
+}
+
+.scroll-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 6rem);
+}
+
+button,
+input,
+select,
+textarea,
+a {
+  font: inherit;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.center-pin-bob {
+  animation: center-pin-float 1.8s ease-in-out infinite;
+}
+
+@keyframes center-pin-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}

@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgis/postgis:17-3.4
+    container_name: wifiyka-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wifiyka
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "54329:5432"
+    volumes:
+      - wifiyka_pgdata:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: wifiyka-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  wifiyka_pgdata:

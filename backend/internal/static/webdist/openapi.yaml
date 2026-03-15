@@ -1,0 +1,367 @@
+openapi: 3.1.0
+info:
+  title: Wifiyka API
+  version: 0.1.0
+  description: REST API for the Wifiyka Wi-Fi map MVP.
+servers:
+  - url: https://wifi.eval.su
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        "200":
+          description: OK
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses:
+        "200":
+          description: Ready
+  /api/v1/session/bootstrap:
+    post:
+      summary: Bootstrap anonymous session
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+  /api/v1/me:
+    get:
+      summary: Current authenticated profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+  /api/v1/auth/email/start-bind:
+    post:
+      summary: Start email bind
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, consent_accepted]
+              properties:
+                email:
+                  type: string
+                consent_accepted:
+                  type: boolean
+      responses:
+        "202":
+          description: Email sent
+  /api/v1/auth/email/confirm-bind:
+    post:
+      summary: Confirm bind token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        "200":
+          description: Updated user
+  /api/v1/auth/email/start-login:
+    post:
+      summary: Start login magic link
+      responses:
+        "202":
+          description: Email queued
+  /api/v1/auth/email/confirm-login:
+    post:
+      summary: Confirm login token
+      responses:
+        "200":
+          description: New authenticated session
+  /api/v1/auth/logout:
+    post:
+      summary: Revoke current session
+      responses:
+        "200":
+          description: Session revoked
+  /api/v1/places:
+    get:
+      summary: Query places
+      parameters:
+        - in: query
+          name: bbox
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Places list
+    post:
+      summary: Create place
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceInput"
+      responses:
+        "201":
+          description: Created place
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Place"
+  /api/v1/places/nearby:
+    get:
+      summary: Nearby places
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: lng
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: radius_km
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Nearby places
+  /api/v1/places/{placeId}:
+    get:
+      summary: Place detail
+      parameters:
+        - $ref: "#/components/parameters/placeId"
+      responses:
+        "200":
+          description: Place detail
+    patch:
+      summary: Update own place
+      parameters:
+        - $ref: "#/components/parameters/placeId"
+      responses:
+        "200":
+          description: Updated place
+    delete:
+      summary: Soft delete own place
+      parameters:
+        - $ref: "#/components/parameters/placeId"
+      responses:
+        "200":
+          description: Deleted
+  /api/v1/places/{placeId}/vote:
+    post:
+      summary: Upsert my vote
+      parameters:
+        - $ref: "#/components/parameters/placeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteInput"
+      responses:
+        "200":
+          description: Vote state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceVote"
+    delete:
+      summary: Delete my vote
+      parameters:
+        - $ref: "#/components/parameters/placeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteInput"
+      responses:
+        "200":
+          description: Vote deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoteDeleteResponse"
+  /api/v1/places/{placeId}/report:
+    post:
+      summary: Report place
+      parameters:
+        - $ref: "#/components/parameters/placeId"
+      responses:
+        "201":
+          description: Report created
+  /api/v1/sync/outbox:
+    post:
+      summary: Apply offline operations
+      responses:
+        "200":
+          description: Sync result
+  /api/v1/sync/bootstrap:
+    get:
+      summary: Bootstrap nearby and my data for offline sync
+      responses:
+        "200":
+          description: Sync bootstrap payload
+  /api/v1/sync/changes:
+    get:
+      summary: Incremental changes since timestamp
+      responses:
+        "200":
+          description: Changed entities
+  /api/v1/offline/manifest:
+    get:
+      summary: Offline pack manifest
+      responses:
+        "200":
+          description: Pack manifest
+components:
+  parameters:
+    placeId:
+      name: placeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    MeResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        session:
+          type: object
+          properties:
+            session_id:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+            is_secure:
+              type: boolean
+            cookie_name:
+              type: string
+    User:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        user_type:
+          type: string
+        display_name:
+          type: string
+          nullable: true
+    PlaceInput:
+      type: object
+      required: [venue_type, place_name, wifi_name, access_type, lat, lng]
+      properties:
+        venue_type:
+          type: string
+        place_name:
+          type: string
+        wifi_name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        promo_text:
+          type: string
+          nullable: true
+        access_type:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+    Place:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/PlaceInput"
+        - type: object
+          properties:
+            place_id:
+              type: string
+              format: uuid
+            user_id:
+              type: string
+              format: uuid
+            status:
+              type: string
+            works_count:
+              type: integer
+            not_works_count:
+              type: integer
+            version:
+              type: integer
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+    VoteInput:
+      type: object
+      required: [vote]
+      properties:
+        vote:
+          type: string
+          enum: [works, not_works]
+        version:
+          type: integer
+          nullable: true
+    DeleteInput:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: integer
+    PlaceVote:
+      type: object
+      properties:
+        place_vote_id:
+          type: string
+          format: uuid
+        place_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        vote:
+          type: string
+          enum: [works, not_works]
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    VoteDeleteResponse:
+      type: object
+      required: [status, place_id, place_vote_id]
+      properties:
+        status:
+          type: string
+          enum: [deleted]
+        place_id:
+          type: string
+          format: uuid
+        place_vote_id:
+          type: string
+          format: uuid
