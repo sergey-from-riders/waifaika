@@ -127,6 +127,8 @@ function AppShell() {
   const installState = useMemo(() => getInstallState(), [installTick]);
   const locationWatchRef = useRef<number | null>(null);
   const compassStopRef = useRef<(() => void) | null>(null);
+  const compassPendingRef = useRef<Promise<boolean> | null>(null);
+  const compassActiveRef = useRef(false);
   const geocodeAbortRef = useRef<AbortController | null>(null);
   const offlineWarmRef = useRef<number | null>(null);
   const sharedPlaceFetchRef = useRef<string | null>(null);
@@ -407,10 +409,41 @@ function AppShell() {
       unsubscribeInstall();
       stopLocationWatch(locationWatchRef.current);
       compassStopRef.current?.();
+      compassActiveRef.current = false;
+      compassPendingRef.current = null;
       geocodeAbortRef.current?.abort();
       window.removeEventListener("online", onOnline);
       window.removeEventListener("focus", onFocus);
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.DeviceOrientationEvent === "undefined") {
+      return;
+    }
+
+    const OrientationCtor = window.DeviceOrientationEvent as (typeof DeviceOrientationEvent & {
+      requestPermission?: () => Promise<"granted" | "denied">;
+    });
+
+    if (typeof OrientationCtor.requestPermission !== "function") {
+      void ensureCompassTracking();
+      return;
+    }
+
+    const armCompass = () => {
+      cleanupInteractionHandlers();
+      void ensureCompassTracking();
+    };
+
+    const cleanupInteractionHandlers = () => {
+      window.removeEventListener("pointerdown", armCompass, true);
+      window.removeEventListener("keydown", armCompass, true);
+    };
+
+    window.addEventListener("pointerdown", armCompass, true);
+    window.addEventListener("keydown", armCompass, true);
+    return cleanupInteractionHandlers;
   }, []);
 
   useEffect(() => {
@@ -720,13 +753,7 @@ function AppShell() {
       return;
     }
 
-    const compass = await requestOrientationAccess();
-    if (compass.status === "granted") {
-      compassStopRef.current?.();
-      compassStopRef.current = startCompassWatch((heading) => setDeviceHeading(heading));
-    } else {
-      setDeviceHeading(null);
-    }
+    await ensureCompassTracking();
 
     setLocationState({ status: "pending" });
     const geo = await requestDeviceLocation("user");
@@ -743,6 +770,35 @@ function AppShell() {
     } else if (geo.status === "denied") {
       setToast({ tone: "info", message: "Доступ к геопозиции заблокирован в браузере" });
     }
+  }
+
+  async function ensureCompassTracking() {
+    if (compassActiveRef.current) {
+      return true;
+    }
+    if (compassPendingRef.current) {
+      return compassPendingRef.current;
+    }
+
+    const pending = requestOrientationAccess()
+      .then((compass) => {
+        if (compass.status !== "granted") {
+          compassActiveRef.current = false;
+          setDeviceHeading(null);
+          return false;
+        }
+
+        compassStopRef.current?.();
+        compassStopRef.current = startCompassWatch((heading) => setDeviceHeading(heading));
+        compassActiveRef.current = true;
+        return true;
+      })
+      .finally(() => {
+        compassPendingRef.current = null;
+      });
+
+    compassPendingRef.current = pending;
+    return pending;
   }
 
   function startLiveLocationWatch() {
@@ -1200,6 +1256,7 @@ function AppShell() {
       onCancelAdd={cancelAddFlow}
       onDismissNearestHint={dismissNearestHint}
       onToggleTheme={toggleTheme}
+      onOpenAbout={() => navigate("/about")}
       offlineUsageLabel={formatStorageUsage(offlineUsageBytes)}
       offlineActionBusy={clearingOffline}
       onClearOffline={clearOfflineData}
@@ -1273,7 +1330,6 @@ function AppShell() {
       {!addFlow ? (
         <BottomNav
           activePath={location.pathname}
-          isMapRoute={isMapRoute}
           addActive={Boolean(addFlow)}
           onOpenAdd={openAddFlow}
         />

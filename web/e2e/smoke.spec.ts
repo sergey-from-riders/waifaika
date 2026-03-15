@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 import { installAppMocks, readClipboardWrites, readConfirmWrites } from "./support/mockApp";
 
@@ -6,11 +6,40 @@ test.beforeEach(async ({ page }) => {
   await installAppMocks(page);
 });
 
+async function expectNoOverlap(first: Locator, second: Locator) {
+  const [firstBox, secondBox] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+
+  expect(firstBox).not.toBeNull();
+  expect(secondBox).not.toBeNull();
+
+  if (!firstBox || !secondBox) {
+    return;
+  }
+
+  const overlaps =
+    firstBox.x < secondBox.x + secondBox.width &&
+    firstBox.x + firstBox.width > secondBox.x &&
+    firstBox.y < secondBox.y + secondBox.height &&
+    firstBox.y + firstBox.height > secondBox.y;
+
+  expect(overlaps).toBe(false);
+}
+
 test("opens map root, deep link, copies share URL and closes place sheet", async ({ page, baseURL }) => {
   await page.goto("/");
 
   await expect(page.getByText("Офлайн-карта Wi-Fi")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: "Добавить Wi-Fi" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("theme-toggle")).toBeVisible();
+  await expect(page.getByTestId("clear-offline-button")).toBeVisible();
+  await expect(page.getByTestId("nearest-hint-card")).toBeVisible();
+  await expect(page.getByTestId("location-button")).toBeVisible();
+  await expect(page.getByTestId("bottom-nav")).toBeVisible();
+  await expectNoOverlap(page.getByTestId("theme-toggle"), page.getByTestId("map-top-title-group"));
+  await expectNoOverlap(page.getByTestId("clear-offline-button"), page.getByTestId("map-top-title-group"));
+  await expectNoOverlap(page.getByTestId("nearest-hint-card"), page.getByTestId("location-button"));
+  await expectNoOverlap(page.getByTestId("nearest-hint-card"), page.getByTestId("bottom-nav"));
+  await expectNoOverlap(page.getByTestId("location-button"), page.getByTestId("bottom-nav"));
 
   await page.goto("/place/place-1");
 
@@ -94,7 +123,8 @@ test("runs add-flow with promo textarea and exposes public API links in about", 
     })
     .toContain("Если потом пропадёт интернет");
 
-  await page.goto("/about");
+  await page.getByRole("button", { name: "О приложении" }).click();
+  await expect(page).toHaveURL(/\/about$/);
   await expect(page.getByText("API", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "openapi.yaml" })).toHaveAttribute("href", "https://wifi.eval.su/openapi.yaml");
   await expect(page.getByText("https://wifi.eval.su/api/v1")).toBeVisible();

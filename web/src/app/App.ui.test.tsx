@@ -50,6 +50,7 @@ beforeEach(() => {
 describe("MapPage", () => {
   it("shows picker guidance without the old bottom banner wording", async () => {
     const onConfirmPickedLocation = vi.fn();
+    const onOpenAbout = vi.fn();
 
     render(
       <MapPage
@@ -84,6 +85,7 @@ describe("MapPage", () => {
         onCancelAdd={vi.fn()}
         onDismissNearestHint={vi.fn()}
         onToggleTheme={vi.fn()}
+        onOpenAbout={onOpenAbout}
         offlineUsageLabel="17.8 МБ"
         offlineActionBusy={false}
         onClearOffline={vi.fn()}
@@ -94,6 +96,8 @@ describe("MapPage", () => {
     expect(screen.getByText("Офлайн-карта Wi-Fi")).toBeInTheDocument();
     expect(screen.getByText("Двигайте карту под Wi-Fi маркер")).toBeInTheDocument();
     expect(screen.queryByText("Поставьте метку")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "О приложении" }));
+    expect(onOpenAbout).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: /Очистить офлайн/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Добавить Вайфай здесь" }));
     expect(onConfirmPickedLocation).toHaveBeenCalledTimes(1);
@@ -126,6 +130,7 @@ describe("MapPage", () => {
         onCancelAdd={vi.fn()}
         onDismissNearestHint={onDismissNearestHint}
         onToggleTheme={vi.fn()}
+        onOpenAbout={vi.fn()}
         offlineUsageLabel="17.8 МБ"
         offlineActionBusy={false}
         onClearOffline={vi.fn()}
@@ -141,25 +146,25 @@ describe("MapPage", () => {
 });
 
 describe("BottomNav", () => {
-  it("shows the updated navigation structure including the about button", () => {
+  it("shows the reduced navigation structure with map, add and activity", () => {
     render(
       <MemoryRouter initialEntries={["/about"]}>
-        <BottomNav activePath="/about" isMapRoute={false} addActive={false} onOpenAdd={vi.fn()} />
+        <BottomNav activePath="/about" addActive={false} onOpenAdd={vi.fn()} />
       </MemoryRouter>,
     );
 
     expect(screen.getByText("Карта")).toBeInTheDocument();
-    expect(screen.getByText("О нас")).toBeInTheDocument();
+    expect(screen.queryByText("О нас")).not.toBeInTheDocument();
     expect(screen.queryByText("Я")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Точки\s+и голоса/i })).toBeInTheDocument();
-    expect(screen.getAllByRole("link")).toHaveLength(3);
+    expect(screen.getByRole("link", { name: /Мои точки/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("link")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Добавить Wi-Fi" })).toBeInTheDocument();
   });
 
   it("keeps the map tab highlighted for place deep links", () => {
     render(
       <MemoryRouter initialEntries={["/place/place-1"]}>
-        <BottomNav activePath="/place/place-1" isMapRoute={true} addActive={false} onOpenAdd={vi.fn()} />
+        <BottomNav activePath="/place/place-1" addActive={false} onOpenAdd={vi.fn()} />
       </MemoryRouter>,
     );
 

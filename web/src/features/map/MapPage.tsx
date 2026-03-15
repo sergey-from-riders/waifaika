@@ -35,6 +35,7 @@ type MapPageProps = {
   onCancelAdd: () => void;
   onDismissNearestHint: () => void;
   onToggleTheme: () => void;
+  onOpenAbout: () => void;
   offlineUsageLabel: string;
   offlineActionBusy: boolean;
   onClearOffline: () => void;
@@ -42,6 +43,8 @@ type MapPageProps = {
 
 export function MapPage(props: MapPageProps) {
   const locationButtonLabel = props.locationState.status === "granted" ? "Вы" : "Где я";
+  const floatingBottomStyle = { bottom: "calc(env(safe-area-inset-bottom) + 5.2rem)" };
+  const warningBottomStyle = { bottom: "calc(env(safe-area-inset-bottom) + 8.9rem)" };
 
   return (
     <section className="relative h-[100dvh] w-full overflow-hidden bg-[var(--map-bg)]">
@@ -65,31 +68,44 @@ export function MapPage(props: MapPageProps) {
 
       {props.addFlow?.step === "pick" ? <CenterPinOverlay draft={props.addFlow.draft} moving={props.pickerMapMoving} /> : null}
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-24">
         <button
           type="button"
           onClick={props.onToggleTheme}
           aria-label={props.theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}
-          className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel-solid)] text-[var(--app-fg)] transition-transform duration-300 ease-out active:scale-95"
+          data-testid="theme-toggle"
+          className="pointer-events-auto absolute left-3 top-[calc(env(safe-area-inset-top)+0.75rem)] inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel-solid)] text-[var(--app-fg)] transition-transform duration-300 ease-out active:scale-95"
         >
           {props.theme === "dark" ? <SunIcon width={20} height={20} /> : <MoonIcon width={20} height={20} />}
         </button>
 
-        <div className="rounded-full border border-[var(--panel-border)] bg-[color:color-mix(in_srgb,var(--panel-solid)_92%,transparent)] px-4 py-2 text-sm font-semibold tracking-[0.08em] text-[var(--app-muted)] backdrop-blur">
-          Офлайн-карта Wi-Fi
+        <div
+          data-testid="map-top-title-group"
+          className="pointer-events-auto absolute left-1/2 top-[calc(env(safe-area-inset-top)+0.75rem)] flex max-w-[calc(100vw-9.75rem)] min-w-0 -translate-x-1/2 items-center"
+        >
+          <div className="flex min-w-0 items-center gap-1.5 rounded-full border border-[var(--panel-border)] bg-[color:color-mix(in_srgb,var(--panel-solid)_92%,transparent)] px-3 py-2 text-[12px] font-semibold tracking-[0.04em] text-[var(--app-muted)] backdrop-blur">
+            <span className="min-w-0 truncate">Офлайн-карта Wi-Fi</span>
+            <button
+              type="button"
+              onClick={props.onOpenAbout}
+              aria-label="О приложении"
+              className="shrink-0 text-[12px] font-bold text-brand-500 transition-opacity duration-300 ease-out active:opacity-70"
+            >
+              (i)
+            </button>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={props.onClearOffline}
           disabled={props.offlineActionBusy}
-          className="pointer-events-auto flex min-h-12 min-w-[8.25rem] flex-col items-start justify-center rounded-[1.15rem] border border-[var(--panel-border)] bg-[color:color-mix(in_srgb,var(--panel-solid)_92%,transparent)] px-3 py-2 text-left text-[var(--app-fg)] backdrop-blur transition-transform duration-300 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label={props.offlineActionBusy ? "Очистить офлайн" : `Очистить офлайн (${props.offlineUsageLabel})`}
+          data-testid="clear-offline-button"
+          className="pointer-events-auto absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] inline-flex h-11 min-w-[4.8rem] items-center justify-center gap-2 rounded-full border border-[var(--panel-border)] bg-[color:color-mix(in_srgb,var(--panel-solid)_92%,transparent)] px-3 text-[13px] font-semibold text-[var(--app-fg)] backdrop-blur transition-transform duration-300 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--app-muted)]">Очистить офлайн</span>
-          <span className="mt-1 inline-flex items-center gap-2 text-sm font-semibold">
-            <Trash2 className="h-4 w-4" strokeWidth={2.2} />
-            {props.offlineActionBusy ? "Очищаю..." : props.offlineUsageLabel}
-          </span>
+          <Trash2 className={cn("h-4 w-4 shrink-0", props.offlineActionBusy ? "animate-pulse" : "")} strokeWidth={2.2} />
+          <span>{props.offlineActionBusy ? "..." : props.offlineUsageLabel}</span>
         </button>
       </div>
 
@@ -109,8 +125,10 @@ export function MapPage(props: MapPageProps) {
         <button
           type="button"
           onClick={props.onEnableLocation}
+          data-testid="location-button"
+          style={floatingBottomStyle}
           className={cn(
-            "absolute bottom-[9.5rem] right-3 z-50 inline-flex h-14 items-center gap-2 rounded-full border px-4 text-base font-semibold transition-transform duration-300 ease-out active:scale-95",
+            "absolute right-3 z-50 inline-flex h-12 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-transform duration-300 ease-out active:scale-95",
             props.locationState.status === "granted"
               ? "border-emerald-400/35 bg-[var(--panel-solid)] text-[var(--app-fg)]"
               : "border-brand-500 bg-brand-500 text-white",
@@ -122,7 +140,10 @@ export function MapPage(props: MapPageProps) {
       ) : null}
 
       {props.locationState.status === "denied" ? (
-        <div className="absolute inset-x-3 bottom-[11.5rem] z-20 rounded-[1.25rem] border border-amber-400/30 bg-[var(--sheet-bg)] px-4 py-3 text-sm text-[var(--app-fg)]">
+        <div
+          className="absolute inset-x-3 z-20 rounded-[1.25rem] border border-amber-400/30 bg-[var(--sheet-bg)] px-4 py-3 text-sm text-[var(--app-fg)]"
+          style={warningBottomStyle}
+        >
           {props.locationState.reason}
         </div>
       ) : null}
@@ -191,7 +212,11 @@ export function NearestHintCard({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute bottom-[8rem] left-3 z-20 w-[min(17rem,calc(100vw-7rem))]">
+    <div
+      data-testid="nearest-hint-card"
+      className="absolute left-3 z-20 w-[min(12rem,calc(100vw-8rem))]"
+      style={{ bottom: "calc(env(safe-area-inset-bottom) + 5.2rem)" }}
+    >
       <div className="glass-panel rounded-[1.5rem] border border-[var(--panel-border)] px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <button
