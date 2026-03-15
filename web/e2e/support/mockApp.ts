@@ -186,6 +186,28 @@ export async function installAppMocks(page: Page) {
   await page.route("**/api/v1/**", async (route) => handleApiRoute(route, state));
 
   await page.route("https://nominatim.openstreetmap.org/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/search")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            lat: "43.5857",
+            lon: "39.7234",
+            display_name: "Навагинская улица, 3, Сочи",
+            address: {
+              road: "Навагинская улица",
+              house_number: "3",
+              city: "Сочи",
+              state: "Краснодарский край",
+            },
+          },
+        ]),
+      });
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",

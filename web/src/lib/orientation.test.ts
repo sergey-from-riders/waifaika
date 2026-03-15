@@ -19,4 +19,17 @@ describe("extractCompassHeading", () => {
       } as DeviceOrientationEvent),
     ).toBe(270);
   });
+
+  it("accounts for screen rotation when using alpha heading", () => {
+    Object.defineProperty(window.screen, "orientation", {
+      configurable: true,
+      value: { angle: 90 },
+    });
+
+    expect(
+      extractCompassHeading({
+        alpha: 90,
+      } as DeviceOrientationEvent),
+    ).toBe(0);
+  });
 });

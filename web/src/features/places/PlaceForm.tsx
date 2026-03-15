@@ -14,15 +14,27 @@ type PlaceFormProps = {
   draft: AddDraft | null;
   onSubmit: (input: PlaceInput) => void;
   onCancel: () => void;
+  onSearchAddress: (query: string) => void | Promise<void>;
+  addressSearchBusy: boolean;
+  addressSearchError: string | null;
 };
 
-export function PlaceForm({ initial, draft, onSubmit, onCancel }: PlaceFormProps) {
+export function PlaceForm({
+  initial,
+  draft,
+  onSubmit,
+  onCancel,
+  onSearchAddress,
+  addressSearchBusy,
+  addressSearchError,
+}: PlaceFormProps) {
   const [venueType, setVenueType] = useState<VenueType>(initial?.venue_type ?? VenueTypeEnum.Cafe);
   const [placeName, setPlaceName] = useState(initial?.place_name ?? "");
   const [wifiName, setWifiName] = useState(initial?.wifi_name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [promoText, setPromoText] = useState(initial?.promo_text ?? "");
   const [accessType, setAccessType] = useState<AccessType>(initial?.access_type ?? AccessTypeEnum.Free);
+  const [searchAddress, setSearchAddress] = useState("");
 
   useEffect(() => {
     const nextDraftDescription = [draft?.title, draft?.subtitle].filter(Boolean).join(", ");
@@ -32,6 +44,7 @@ export function PlaceForm({ initial, draft, onSubmit, onCancel }: PlaceFormProps
     setDescription(initial?.description ?? nextDraftDescription);
     setPromoText(initial?.promo_text ?? "");
     setAccessType(initial?.access_type ?? AccessTypeEnum.Free);
+    setSearchAddress(initial?.description ?? nextDraftDescription);
   }, [draft?.subtitle, draft?.title, initial]);
 
   return (
@@ -59,6 +72,34 @@ export function PlaceForm({ initial, draft, onSubmit, onCancel }: PlaceFormProps
         <p className="mt-2 text-lg font-semibold">{draft?.title ?? "Точка на карте"}</p>
         <p className="mt-1 text-sm text-[var(--app-muted)]">{draft?.subtitle ?? "Сочи"}</p>
       </div>
+
+      <label className="block space-y-2">
+        <span className="text-base font-semibold">Найти адрес на карте</span>
+        <div className="flex items-stretch gap-2">
+          <input
+            className="min-w-0 flex-1 rounded-[1.1rem] border border-[var(--panel-border)] bg-[var(--panel-muted)] px-4 py-4 text-base text-[var(--app-fg)]"
+            value={searchAddress}
+            placeholder="Введите адрес, и точка сместится туда"
+            onChange={(event) => setSearchAddress(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void onSearchAddress(searchAddress);
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => void onSearchAddress(searchAddress)}
+            disabled={addressSearchBusy || !searchAddress.trim()}
+            className="shrink-0 rounded-[1.1rem] bg-brand-500 px-4 py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-500"
+          >
+            {addressSearchBusy ? "Ищу..." : "Найти"}
+          </button>
+        </div>
+        <p className="text-sm text-[var(--app-muted)]">Используется прямой поиск Nominatim. После поиска карта и координаты сместятся к найденному адресу.</p>
+        {addressSearchError ? <p className="text-sm text-amber-500">{addressSearchError}</p> : null}
+      </label>
 
       <TextField
         label="Адрес / ориентир"

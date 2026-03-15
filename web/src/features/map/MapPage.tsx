@@ -37,6 +37,7 @@ type MapPageProps = {
   onToggleTheme: () => void;
   onOpenAbout: () => void;
   offlineUsageLabel: string;
+  offlineCacheState: "idle" | "caching" | "cached" | "error";
   offlineActionBusy: boolean;
   onClearOffline: () => void;
 };
@@ -96,17 +97,33 @@ export function MapPage(props: MapPageProps) {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={props.onClearOffline}
-          disabled={props.offlineActionBusy}
-          aria-label={props.offlineActionBusy ? "Очистить офлайн" : `Очистить офлайн (${props.offlineUsageLabel})`}
-          data-testid="clear-offline-button"
-          className="pointer-events-auto absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] inline-flex h-11 min-w-[4.8rem] items-center justify-center gap-2 rounded-full border border-[var(--panel-border)] bg-[color:color-mix(in_srgb,var(--panel-solid)_92%,transparent)] px-3 text-[13px] font-semibold text-[var(--app-fg)] backdrop-blur transition-transform duration-300 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Trash2 className={cn("h-4 w-4 shrink-0", props.offlineActionBusy ? "animate-pulse" : "")} strokeWidth={2.2} />
-          <span>{props.offlineActionBusy ? "..." : props.offlineUsageLabel}</span>
-        </button>
+        <div className="pointer-events-none absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)]">
+          <span
+            aria-hidden="true"
+            className={cn(
+              "absolute inset-[-0.35rem] rounded-full border opacity-0 transition-all duration-300",
+              props.offlineCacheState === "caching" ? "animate-ping border-sky-400/70 opacity-100" : "",
+              props.offlineCacheState === "cached" ? "border-emerald-400/55 opacity-100" : "",
+              props.offlineCacheState === "error" ? "border-amber-400/60 opacity-100" : "",
+            )}
+          />
+          <button
+            type="button"
+            onClick={props.onClearOffline}
+            disabled={props.offlineActionBusy}
+            aria-label={props.offlineActionBusy ? "Очистить офлайн" : `Очистить офлайн (${props.offlineUsageLabel})`}
+            data-testid="clear-offline-button"
+            className={cn(
+              "pointer-events-auto relative inline-flex h-11 min-w-[4.8rem] items-center justify-center gap-2 rounded-full border bg-[color:color-mix(in_srgb,var(--panel-solid)_92%,transparent)] px-3 text-[13px] font-semibold text-[var(--app-fg)] backdrop-blur transition-transform duration-300 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
+              props.offlineCacheState === "caching" ? "border-sky-400/70 shadow-[0_0_0_1px_rgba(56,189,248,0.22)]" : "border-[var(--panel-border)]",
+              props.offlineCacheState === "cached" ? "border-emerald-400/55" : "",
+              props.offlineCacheState === "error" ? "border-amber-400/60" : "",
+            )}
+          >
+            <Trash2 className={cn("h-4 w-4 shrink-0", props.offlineActionBusy || props.offlineCacheState === "caching" ? "animate-pulse" : "")} strokeWidth={2.2} />
+            <span>{props.offlineActionBusy ? "..." : props.offlineUsageLabel}</span>
+          </button>
+        </div>
       </div>
 
       {props.nearestHintPlace ? (
@@ -214,10 +231,10 @@ export function NearestHintCard({
   return (
     <div
       data-testid="nearest-hint-card"
-      className="absolute left-3 z-20 w-[min(12rem,calc(100vw-8rem))]"
+      className="absolute left-3 z-20 w-[min(14.5rem,calc(100vw-6.8rem))]"
       style={{ bottom: "calc(env(safe-area-inset-bottom) + 5.2rem)" }}
     >
-      <div className="glass-panel rounded-[1.5rem] border border-[var(--panel-border)] px-4 py-3">
+      <div className="glass-panel rounded-[1.5rem] border border-[var(--panel-border)] bg-[color:color-mix(in_srgb,var(--panel-solid)_94%,#dbeafe_6%)] px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <button
             type="button"
@@ -225,7 +242,7 @@ export function NearestHintCard({
             className="min-w-0 flex-1 text-left transition-opacity duration-300 ease-out active:opacity-70"
           >
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-brand-500">Ближе всего</p>
-            <p className="mt-1 truncate text-lg font-semibold">{place.place_name}</p>
+            <p className="mt-1 line-clamp-2 text-lg font-semibold">{place.place_name}</p>
             <p className="mt-1 text-sm text-[var(--app-muted)]">{formatDistance(place.distance_meters)}</p>
           </button>
           <button

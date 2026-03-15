@@ -98,6 +98,12 @@ test("runs add-flow with promo textarea and exposes public API links in about", 
   await page.getByRole("button", { name: "Добавить Вайфай здесь" }).click();
   await expect(page.getByRole("heading", { name: "Добавить Вайфай" })).toBeVisible();
 
+  const geocodeField = page.getByLabel("Найти адрес на карте");
+  await expect(geocodeField).toBeVisible();
+  await geocodeField.fill("Навагинская, 3");
+  await page.getByRole("button", { name: "Найти" }).click();
+  await expect(page.getByText("Навагинская улица, 3", { exact: true })).toBeVisible({ timeout: 15_000 });
+
   const addressField = page.getByLabel("Адрес / ориентир");
   await expect(addressField).toBeVisible();
   const promoField = page.getByLabel("Промо");

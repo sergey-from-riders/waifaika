@@ -7,9 +7,14 @@ type OrientationPermissionResponse = {
 
 type OrientationEventWithWebkit = DeviceOrientationEvent & {
   webkitCompassHeading?: number | null;
+  absolute?: boolean | null;
 };
 
 type DeviceOrientationConstructor = typeof DeviceOrientationEvent & {
+  requestPermission?: () => Promise<"granted" | "denied">;
+};
+
+type DeviceMotionConstructor = typeof DeviceMotionEvent & {
   requestPermission?: () => Promise<"granted" | "denied">;
 };
 
@@ -19,14 +24,18 @@ export async function requestOrientationAccess(): Promise<OrientationPermissionR
   }
 
   const OrientationCtor = window.DeviceOrientationEvent as DeviceOrientationConstructor | undefined;
+  const MotionCtor = window.DeviceMotionEvent as DeviceMotionConstructor | undefined;
   if (!OrientationCtor) {
     return { status: "denied", reason: "Компас недоступен в этом браузере" };
   }
 
-  if (typeof OrientationCtor.requestPermission === "function") {
+  if (typeof OrientationCtor.requestPermission === "function" || typeof MotionCtor?.requestPermission === "function") {
     try {
-      const permission = await OrientationCtor.requestPermission();
-      if (permission === "granted") {
+      const permissions = await Promise.all([
+        typeof OrientationCtor.requestPermission === "function" ? OrientationCtor.requestPermission() : Promise.resolve("granted"),
+        typeof MotionCtor?.requestPermission === "function" ? MotionCtor.requestPermission() : Promise.resolve("granted"),
+      ]);
+      if (permissions.every((permission) => permission === "granted")) {
         return { status: "granted" };
       }
       return { status: "denied", reason: "Доступ к компасу отклонён в настройках iPhone" };
@@ -68,7 +77,21 @@ export function extractCompassHeading(event: OrientationEventWithWebkit) {
     return normalizeDegrees(event.webkitCompassHeading);
   }
   if (typeof event.alpha === "number") {
-    return normalizeDegrees(360 - event.alpha);
+    return normalizeDegrees(360 - event.alpha + getScreenOrientationAngle());
   }
   return null;
+}
+
+function getScreenOrientationAngle() {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  const screenAngle = window.screen.orientation?.angle;
+  if (typeof screenAngle === "number") {
+    return screenAngle;
+  }
+
+  const legacyAngle = (window as Window & { orientation?: number }).orientation;
+  return typeof legacyAngle === "number" ? legacyAngle : 0;
 }

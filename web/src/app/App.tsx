@@ -28,7 +28,7 @@ import {
   SOCHI_CENTER,
 } from "@/lib/geolocation";
 import { api } from "@/lib/api";
-import { reverseGeocode } from "@/lib/nominatim";
+import { reverseGeocode, searchGeocode } from "@/lib/nominatim";
 import {
   clearOfflineCaches,
   DATA_CACHE_NAME,
@@ -73,6 +73,7 @@ import { PrivacyPage } from "@/pages/PrivacyPage";
 const MAP_RADIUS_KM = 100;
 const NEARBY_HINT_DISMISSED_KEY = "wifiyka-nearest-hint-dismissed";
 type ThemePreference = UiTheme | "system";
+type OfflineCacheIndicatorState = "idle" | "caching" | "cached" | "error";
 
 export { AboutPage, BottomNav, MapPage, PlaceSheet };
 
@@ -108,7 +109,10 @@ function AppShell() {
   const [installTick, setInstallTick] = useState(0);
   const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
   const [offlineUsageBytes, setOfflineUsageBytes] = useState(0);
+  const [offlineCacheState, setOfflineCacheState] = useState<OfflineCacheIndicatorState>("idle");
   const [clearingOffline, setClearingOffline] = useState(false);
+  const [addressSearchBusy, setAddressSearchBusy] = useState(false);
+  const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
     if (typeof window === "undefined") {
       return "system";
@@ -130,7 +134,10 @@ function AppShell() {
   const compassPendingRef = useRef<Promise<boolean> | null>(null);
   const compassActiveRef = useRef(false);
   const geocodeAbortRef = useRef<AbortController | null>(null);
+  const geocodeSearchAbortRef = useRef<AbortController | null>(null);
   const offlineWarmRef = useRef<number | null>(null);
+  const offlineIndicatorTimeoutRef = useRef<number | null>(null);
+  const offlineCacheOpsRef = useRef(0);
   const sharedPlaceFetchRef = useRef<string | null>(null);
   const viewportCoverageRef = useRef<string | null>(null);
   const theme = themePreference === "system" ? (systemPrefersDark ? "dark" : "light") : themePreference;
@@ -227,23 +234,33 @@ function AppShell() {
 
   async function cacheMissingPacks(packs: OfflinePack[], nextRegions: RegionRecord[], targetCenter = center) {
     const activeRegion = pickRegionForCenter(nextRegions, targetCenter, packs[0]?.pack_id);
+    let allCached = true;
     for (const pack of packs) {
       const cached = nextRegions.find((item) => item.pack_id === pack.pack_id && item.cache_status === "cached");
       if (!cached) {
-        await downloadPack(pack, activeRegion?.pack_id === pack.pack_id);
+        const success = await downloadPack(pack, activeRegion?.pack_id === pack.pack_id);
+        allCached = allCached && success;
       }
     }
+    return allCached;
   }
 
   async function applyCoveragePayload(packs: OfflinePack[], places: Place[], targetCenter = center) {
-    setNearbyPlaces(places);
-    await db.app_state.put({ key: "nearby_places", value: places });
-    const nextRegions = await applyOfflinePacks(packs, targetCenter);
-    await persistNearbySnapshot(packs, places);
-    await cacheMissingPacks(packs, nextRegions, targetCenter);
-    void requestPersistentStorage();
-    await refreshOfflineUsage();
-    return nextRegions;
+    const finishCaching = beginOfflineCaching();
+    try {
+      setNearbyPlaces(places);
+      await db.app_state.put({ key: "nearby_places", value: places });
+      const nextRegions = await applyOfflinePacks(packs, targetCenter);
+      await persistNearbySnapshot(packs, places);
+      const packsCached = await cacheMissingPacks(packs, nextRegions, targetCenter);
+      void requestPersistentStorage();
+      await refreshOfflineUsage();
+      finishCaching(packsCached ? "cached" : "error");
+      return nextRegions;
+    } catch (error) {
+      finishCaching("error");
+      throw error;
+    }
   }
 
   async function restoreViewportFromCache(targetCenter = center) {
@@ -281,6 +298,27 @@ function AppShell() {
     } catch (error) {
       console.error(error);
     }
+  }
+
+  function beginOfflineCaching() {
+    offlineCacheOpsRef.current += 1;
+    if (offlineIndicatorTimeoutRef.current != null) {
+      window.clearTimeout(offlineIndicatorTimeoutRef.current);
+      offlineIndicatorTimeoutRef.current = null;
+    }
+    setOfflineCacheState("caching");
+
+    return (nextState: Exclude<OfflineCacheIndicatorState, "caching"> = "cached") => {
+      offlineCacheOpsRef.current = Math.max(0, offlineCacheOpsRef.current - 1);
+      if (offlineCacheOpsRef.current > 0) {
+        return;
+      }
+      setOfflineCacheState(nextState);
+      offlineIndicatorTimeoutRef.current = window.setTimeout(() => {
+        setOfflineCacheState("idle");
+        offlineIndicatorTimeoutRef.current = null;
+      }, nextState === "error" ? 2600 : 1600);
+    };
   }
 
   const visiblePlaces = useMemo(() => {
@@ -412,6 +450,10 @@ function AppShell() {
       compassActiveRef.current = false;
       compassPendingRef.current = null;
       geocodeAbortRef.current?.abort();
+      geocodeSearchAbortRef.current?.abort();
+      if (offlineIndicatorTimeoutRef.current != null) {
+        window.clearTimeout(offlineIndicatorTimeoutRef.current);
+      }
       window.removeEventListener("online", onOnline);
       window.removeEventListener("focus", onFocus);
     };
@@ -432,16 +474,23 @@ function AppShell() {
     }
 
     const armCompass = () => {
-      cleanupInteractionHandlers();
-      void ensureCompassTracking();
+      void ensureCompassTracking().then((granted) => {
+        if (granted) {
+          cleanupInteractionHandlers();
+        }
+      });
     };
 
     const cleanupInteractionHandlers = () => {
       window.removeEventListener("pointerdown", armCompass, true);
+      window.removeEventListener("touchstart", armCompass, true);
+      window.removeEventListener("click", armCompass, true);
       window.removeEventListener("keydown", armCompass, true);
     };
 
     window.addEventListener("pointerdown", armCompass, true);
+    window.addEventListener("touchstart", armCompass, true);
+    window.addEventListener("click", armCompass, true);
     window.addEventListener("keydown", armCompass, true);
     return cleanupInteractionHandlers;
   }, []);
@@ -734,6 +783,7 @@ function AppShell() {
         return source;
       });
       await refreshOfflineUsage();
+      return true;
     } catch {
       const previous = await db.regions.get(pack.pack_id);
       const region = {
@@ -743,6 +793,7 @@ function AppShell() {
       };
       await db.regions.put(region);
       setRegions((current) => upsertRegionRecord(current, region));
+      return false;
     }
   }
 
@@ -769,6 +820,60 @@ function AppShell() {
       setToast({ tone: "info", message: "Браузер ждёт системный ответ по геопозиции" });
     } else if (geo.status === "denied") {
       setToast({ tone: "info", message: "Доступ к геопозиции заблокирован в браузере" });
+    }
+  }
+
+  async function searchAddressForDraft(query: string) {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery || !addFlow) {
+      return;
+    }
+
+    geocodeSearchAbortRef.current?.abort();
+    const controller = new AbortController();
+    geocodeSearchAbortRef.current = controller;
+    setAddressSearchBusy(true);
+    setAddressSearchError(null);
+
+    try {
+      const [match] = await searchGeocode(normalizedQuery, controller.signal);
+      if (!match) {
+        setAddressSearchError("Nominatim не нашёл такой адрес");
+        return;
+      }
+
+      const nextCenter = { lat: match.lat, lng: match.lng };
+      await persistCenter(nextCenter);
+      setPickerMapMoving(false);
+      setAddFlow((current) =>
+        current
+          ? {
+              ...current,
+              draft: {
+                ...current.draft,
+                lat: match.lat,
+                lng: match.lng,
+                title: match.title,
+                subtitle: match.subtitle,
+                isResolving: false,
+                error: null,
+              },
+            }
+          : current,
+      );
+      setToast({ tone: "success", message: "Точку переместил к найденному адресу" });
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        return;
+      }
+      console.error(error);
+      setAddressSearchError("Поиск адреса временно не ответил");
+      setToast({ tone: "error", message: "Не удалось найти адрес через Nominatim" });
+    } finally {
+      if (geocodeSearchAbortRef.current === controller) {
+        geocodeSearchAbortRef.current = null;
+      }
+      setAddressSearchBusy(false);
     }
   }
 
@@ -1034,9 +1139,11 @@ function AppShell() {
 
   function openAddFlow() {
     const origin = currentLocation ?? center;
+    void ensureCompassTracking();
     setSelectedPlaceId(null);
     setEditingLocalId(null);
     setNearestHintDismissed(false);
+    setAddressSearchError(null);
     setAddFlow({
       step: "pick",
       draft: {
@@ -1059,6 +1166,7 @@ function AppShell() {
       return;
     }
     setEditingLocalId(localId);
+    setAddressSearchError(null);
     setAddFlow({
       step: "form",
       draft: {
@@ -1082,6 +1190,7 @@ function AppShell() {
   }
 
   function selectPlace(place: Place) {
+    void ensureCompassTracking();
     setAddFlow(null);
     setSelectedPlaceId(place.place_id);
     navigate(`/place/${encodeURIComponent(place.place_id)}`, { replace: true });
@@ -1130,6 +1239,7 @@ function AppShell() {
     void persistCenter(nextCenter);
 
     if (addFlow?.step === "pick") {
+      setAddressSearchError(null);
       setAddFlow((current) =>
         current?.step === "pick"
           ? {
@@ -1159,6 +1269,7 @@ function AppShell() {
   }
 
   function confirmPickedLocation() {
+    setAddressSearchError(null);
     setAddFlow((current) => (current?.step === "pick" ? { ...current, step: "form" } : current));
   }
 
@@ -1166,6 +1277,8 @@ function AppShell() {
     setAddFlow(null);
     setEditingLocalId(null);
     setPickerMapMoving(false);
+    setAddressSearchError(null);
+    geocodeSearchAbortRef.current?.abort();
   }
 
   function dismissNearestHint() {
@@ -1204,6 +1317,7 @@ function AppShell() {
       if (!navigator.onLine) {
         setNearbyPlaces([]);
       }
+      setOfflineCacheState("idle");
       await refreshOfflineUsage();
       setToast({ tone: "success", message: "Офлайн-кэш очищен" });
       if (navigator.onLine) {
@@ -1258,6 +1372,7 @@ function AppShell() {
       onToggleTheme={toggleTheme}
       onOpenAbout={() => navigate("/about")}
       offlineUsageLabel={formatStorageUsage(offlineUsageBytes)}
+      offlineCacheState={offlineCacheState}
       offlineActionBusy={clearingOffline}
       onClearOffline={clearOfflineData}
     />
@@ -1367,6 +1482,9 @@ function AppShell() {
           draft={addFlow?.step === "form" ? addFlow.draft : null}
           onSubmit={submitPlace}
           onCancel={cancelAddFlow}
+          onSearchAddress={searchAddressForDraft}
+          addressSearchBusy={addressSearchBusy}
+          addressSearchError={addressSearchError}
         />
       </BottomSheet>
 

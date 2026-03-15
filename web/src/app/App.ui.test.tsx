@@ -87,6 +87,7 @@ describe("MapPage", () => {
         onToggleTheme={vi.fn()}
         onOpenAbout={onOpenAbout}
         offlineUsageLabel="17.8 МБ"
+        offlineCacheState="idle"
         offlineActionBusy={false}
         onClearOffline={vi.fn()}
       />,
@@ -132,6 +133,7 @@ describe("MapPage", () => {
         onToggleTheme={vi.fn()}
         onOpenAbout={vi.fn()}
         offlineUsageLabel="17.8 МБ"
+        offlineCacheState="idle"
         offlineActionBusy={false}
         onClearOffline={vi.fn()}
       />,
