@@ -67,3 +67,22 @@
 ### Risks
 - В `git` всё ещё нет старой истории проекта: текущее состояние можно зафиксировать коммитом, но полноценного change history за предыдущие итерации нет.
 - Manual QA и Lighthouse остаются внешними к этой CLI-среде задачами; автоматические smoke их не заменяют.
+
+## 2026-03-15 13:47 MSK
+
+### Done
+- Локальный пакет изменений выкачен на `hellor8g@185.225.32.121:/var/www/sergey/wifiyka/current`.
+- На сервере выполнен `./deploy/build-release.sh`, пересобраны frontend assets, embedded static и `dist/wifiyka-server`.
+- Продовый процесс обновлён через `systemd`: `wifiyka.service` поднялся с новым `MainPID`.
+- Post-deploy проверка успешна:
+  - `https://wifi.eval.su/healthz` -> `200 {"status":"ok"}`
+  - `https://wifi.eval.su/openapi.yaml` -> `200`
+  - `https://wifi.eval.su/` -> новый `index` и свежий asset bundle.
+
+### Next
+- Отдельно прогнать manual QA на реальном мобильном устройстве по карте, add-flow, шарингу и очистке офлайна.
+- Если нужен строгий release-gate из ТЗ, снять Lighthouse `Accessibility / Best Practices / SEO`.
+
+### Risks
+- Первый внешний запрос к `openapi.yaml` попал в короткое окно рестарта и дал `404`, после стабилизации процесса endpoint отвечает штатно.
+- Предыдущая история проекта в git отсутствовала до этого дня; prod теперь выровнен по текущему локальному baseline, но старые изменения не восстановлены как commits.
