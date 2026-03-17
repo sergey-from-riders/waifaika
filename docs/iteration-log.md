@@ -172,3 +172,26 @@
 ### Risks
 - На проде сейчас лежат install-time placeholder legal files; перед публичным запуском их нужно заменить на реальные тексты оператора.
 - Legal docs не попадают в build-артефакты намеренно и зависят от runtime `LEGAL_DOCS_DIR`; если каталог не создан, UI покажет состояние `Документ не установлен`.
+
+## 2026-03-17 22:39 MSK
+
+### Done
+- Добавлен отдельный локальный capture-пайплайн `web/scripts/capture-readme-screenshots.mjs`: он поднимает `vite preview`, запускает headless Google Chrome, навешивает e2e-моки и сохраняет showcase PNG в `docs/screenshots/`.
+- Сняты презентационные скриншоты ключевых сценариев:
+  - карта / nearby shell
+  - place sheet с новой share-кнопкой
+  - add-flow
+  - activity
+  - about/API screen
+  - self-hosted API docs
+- `README.md` обновлён под публичную презентацию репозитория: добавлена галерея возможностей, отмечены self-hosted API docs и install-time `deploy/legal/*.txt`.
+- Итерация локальная-only: прод не перекатывался повторно, так как runtime-код не менялся после предыдущего деплоя.
+- Локальная проверка завершена успешно:
+  - `PLAYWRIGHT_CHROME_PATH=/usr/bin/google-chrome-stable node web/scripts/capture-readme-screenshots.mjs`
+
+### Next
+- При желании можно добавить desktop-скриншот основной карты и отдельный short GIF с add-flow / share-flow, но для README текущего набора уже достаточно.
+
+### Risks
+- README screenshots сняты на локальных e2e-моках, а не на live backend; они корректно показывают продуктовые сценарии, но не иллюстрируют состояние реальных данных продовой базы.
+- Скриншотный скрипт стартует локальный preview-server и headless Chrome; если порт `4173` занят или Chrome отсутствует, съёмка потребует ручной корректировки окружения.
