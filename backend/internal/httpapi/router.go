@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -20,15 +21,17 @@ type Router struct {
 	service      Service
 	staticRoot   http.Handler
 	offlinePacks http.Handler
+	legalDocs    http.Handler
 	cookieName   string
 	secure       bool
 }
 
-func New(service Service, staticRoot http.Handler, offlinePacks http.Handler, cookieName string, secure bool) http.Handler {
+func New(service Service, staticRoot http.Handler, offlinePacks http.Handler, legalDocs http.Handler, cookieName string, secure bool) http.Handler {
 	rt := &Router{
 		service:      service,
 		staticRoot:   staticRoot,
 		offlinePacks: offlinePacks,
+		legalDocs:    legalDocs,
 		cookieName:   cookieName,
 		secure:       secure,
 	}
@@ -39,18 +42,19 @@ func New(service Service, staticRoot http.Handler, offlinePacks http.Handler, co
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 	r.Use(middleware.Timeout(30 * time.Second))
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Permissions-Policy", "geolocation=(self)")
-			next.ServeHTTP(w, r)
-		})
-	})
+	r.Use(rt.securityHeaders)
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, r, http.StatusOK, map[string]any{"status": "ok"})
 	})
 	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, r, http.StatusOK, map[string]any{"status": "ready"})
+	})
+	r.Get("/api-docs", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/api-docs.html", http.StatusTemporaryRedirect)
+	})
+	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/api-docs.html", http.StatusTemporaryRedirect)
 	})
 
 	r.Route("/api/v1", func(api chi.Router) {
@@ -82,6 +86,10 @@ func New(service Service, staticRoot http.Handler, offlinePacks http.Handler, co
 
 	if offlinePacks != nil {
 		r.Handle("/offline-packs/*", http.StripPrefix("/offline-packs/", offlinePacks))
+	}
+	if legalDocs != nil {
+		r.Get("/legal/privacy.txt", legalDocs.ServeHTTP)
+		r.Get("/legal/consent-personal-data-email.txt", legalDocs.ServeHTTP)
 	}
 	if staticRoot != nil {
 		r.Handle("/*", staticRoot)
@@ -422,8 +430,13 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 
 func decodeJSON(r *http.Request, target any) error {
 	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
 		return apperr.Validation("invalid JSON body", nil)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return apperr.Validation("JSON body must contain a single object", nil)
 	}
 	return nil
 }
@@ -465,4 +478,18 @@ func clientIP(r *http.Request) string {
 		return strings.TrimSpace(r.RemoteAddr)
 	}
 	return host
+}
+
+func (rt *Router) securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Permissions-Policy", "geolocation=(self)")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		if rt.secure {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+		next.ServeHTTP(w, r)
+	})
 }

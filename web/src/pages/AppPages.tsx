@@ -108,8 +108,10 @@ export function PlainPage({ title, backTo, children }: { title: string; backTo: 
 }
 
 export function AboutPage(props: AboutPageProps) {
-  const openapiUrl = "https://wifi.eval.su/openapi.yaml";
-  const apiBaseUrl = "https://wifi.eval.su/api/v1";
+  const origin = typeof window === "undefined" ? "https://wifi.eval.su" : window.location.origin;
+  const openapiUrl = new URL("/openapi.yaml", origin).toString();
+  const apiBaseUrl = new URL("/api/v1", origin).toString();
+  const apiDocsUrl = new URL("/api-docs.html", origin).toString();
 
   return (
     <section className="space-y-5 text-base leading-7">
@@ -221,13 +223,16 @@ export function AboutPage(props: AboutPageProps) {
       <section className="rounded-[1.5rem] bg-[var(--panel-muted)] p-4">
         <p className="text-lg font-semibold">API</p>
         <p className="mt-2 text-[var(--app-muted)]">
-          Публичный API и актуальная OpenAPI-спецификация доступны прямо с продового домена.
+          Публичный API, актуальная OpenAPI-спецификация и отдельный интерфейс в стиле Swagger доступны прямо с текущего домена.
         </p>
         <div className="mt-3 space-y-3">
           <a href={apiBaseUrl} target="_blank" rel="noreferrer" className="block rounded-[1rem] bg-[var(--panel-solid)] px-4 py-3 text-sm font-semibold text-brand-500">
             {apiBaseUrl}
           </a>
           <div className="flex flex-wrap gap-3">
+            <a href={apiDocsUrl} target="_blank" rel="noreferrer" className="rounded-full bg-brand-500 px-4 py-3 font-semibold text-white">
+              Открыть API UI
+            </a>
             <a href={openapiUrl} target="_blank" rel="noreferrer" className="rounded-full bg-[var(--panel-solid)] px-4 py-3 font-semibold text-brand-500">
               openapi.yaml
             </a>

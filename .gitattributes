@@ -1,0 +1,6 @@
+web/package-lock.json linguist-generated=true
+docs/openapi.yaml linguist-generated=true
+web/public/openapi.yaml linguist-generated=true
+backend/internal/static/webdist/** linguist-generated=true
+deploy/offline-packs/*.pmtiles binary linguist-vendored=true
+docs/*.json linguist-generated=true

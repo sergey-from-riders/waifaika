@@ -24,6 +24,7 @@ type Config struct {
 	SMTPFrom           string
 	SMTPFromName       string
 	StaticDir          string
+	LegalDocsDir       string
 	OfflinePacksDir    string
 	OfflinePacksBase   string
 	DefaultMapCenterLat float64
@@ -46,6 +47,7 @@ func Load() (Config, error) {
 		SMTPFrom:            os.Getenv("SMTP_FROM"),
 		SMTPFromName:        getenv("SMTP_FROM_NAME", "Wifiyka"),
 		StaticDir:           os.Getenv("STATIC_DIR"),
+		LegalDocsDir:        getenv("LEGAL_DOCS_DIR", "./deploy/legal"),
 		OfflinePacksDir:     getenv("OFFLINE_PACKS_DIR", "./offline-packs"),
 		OfflinePacksBase:    getenv("OFFLINE_PACKS_BASE_URL", "/offline-packs"),
 		DefaultMapCenterLat: floatEnv("DEFAULT_MAP_CENTER_LAT", 43.5854823),

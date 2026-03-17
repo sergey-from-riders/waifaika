@@ -8,9 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 
 	"wifiyka/backend/internal/app"
@@ -65,14 +66,35 @@ func main() {
 		os.Exit(1)
 	}
 	staticHandler = handler
+	var legalDocsHandler http.Handler
+	legalDocsHandler, err = static.NewLegalDocs(cfg.LegalDocsDir)
+	if err != nil {
+		logger.Error("legal docs setup failed", "error", err)
+		os.Exit(1)
+	}
 	var offlineHandler http.Handler
 	if strings.TrimSpace(cfg.OfflinePacksDir) != "" {
 		offlineHandler = http.FileServer(http.Dir(cfg.OfflinePacksDir))
 	}
 
-	router := httpapi.New(service, staticHandler, offlineHandler, cfg.SessionCookieName, strings.HasPrefix(cfg.BaseURL, "https://"))
+	router := httpapi.New(
+		service,
+		staticHandler,
+		offlineHandler,
+		legalDocsHandler,
+		cfg.SessionCookieName,
+		strings.HasPrefix(cfg.BaseURL, "https://"),
+	)
+	server := &http.Server{
+		Addr:              cfg.ListenAddr,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	logger.Info("server starting", "listen_addr", cfg.ListenAddr)
-	if err := http.ListenAndServe(cfg.ListenAddr, router); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		logger.Error("server stopped", "error", err)
 		os.Exit(1)
 	}
@@ -86,6 +108,8 @@ func migrate(databaseURL string) error {
 	defer db.Close()
 
 	dir := filepath.Clean(filepath.Join("..", "migrations"))
-	goose.SetDialect("postgres")
+	if err := goose.SetDialect("postgres"); err != nil {
+		return err
+	}
 	return goose.Up(db, dir)
 }

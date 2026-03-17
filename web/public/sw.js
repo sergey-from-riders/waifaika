@@ -1,4 +1,4 @@
-const APP_CACHE = "wifiyka-shell-v5";
+const APP_CACHE = "wifiyka-shell-v6";
 const DATA_CACHE = "wifiyka-data-v4";
 const PACK_CACHE = "wifiyka-offline-packs-v4";
 const MANUAL_PACK_CACHE = "wifiyka-manual-packs";
@@ -9,7 +9,10 @@ const APP_ASSETS = [
   "/favicon.svg",
   "/apple-touch-icon.svg",
   "/asset-manifest.json",
+  "/api-docs.html",
   "/openapi.yaml",
+  "/swagger-ui/swagger-ui.css",
+  "/swagger-ui/swagger-ui-bundle.js",
 ];
 
 async function discoverBuildAssets() {
@@ -145,7 +148,10 @@ self.addEventListener("fetch", (event) => {
     url.pathname === "/favicon.svg" ||
     url.pathname === "/apple-touch-icon.svg" ||
     url.pathname === "/asset-manifest.json" ||
-    url.pathname === "/openapi.yaml"
+    url.pathname === "/api-docs.html" ||
+    url.pathname === "/openapi.yaml" ||
+    url.pathname === "/swagger-ui/swagger-ui.css" ||
+    url.pathname === "/swagger-ui/swagger-ui-bundle.js"
   ) {
     event.respondWith(cacheFirst(request, APP_CACHE));
     return;

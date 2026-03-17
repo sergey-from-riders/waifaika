@@ -39,10 +39,11 @@ export function PlaceSheet(props: PlaceSheetProps) {
         <button
           type="button"
           onClick={() => props.onShare(props.place)}
-          aria-label="Поделиться точкой"
-          className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--panel-border)] bg-[var(--panel-muted)] text-[var(--app-fg)] transition-transform duration-300 ease-out active:scale-95"
+          className="inline-flex h-12 shrink-0 items-center gap-2 rounded-full border border-brand-500/20 bg-brand-500 px-4 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(37,99,235,0.28)] transition-transform duration-300 ease-out hover:-translate-y-0.5 active:scale-95"
         >
-          <Share1Icon />
+          <Share1Icon className="h-4 w-4" />
+          <span>Поделиться</span>
+          <span className="sr-only"> точкой</span>
         </button>
       </div>
 

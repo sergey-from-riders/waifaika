@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
+	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -112,7 +112,13 @@ func (a *App) OfflineManifest(ctx context.Context, query models.NearbyQuery) (mo
 	if err := a.ensureOfflinePacksDir(); err != nil {
 		return models.OfflineManifestResponse{}, apperr.Internal(err)
 	}
-	entries, err := os.ReadDir(a.cfg.OfflinePacksDir)
+	root, err := os.OpenRoot(a.cfg.OfflinePacksDir)
+	if err != nil {
+		return models.OfflineManifestResponse{}, apperr.Internal(err)
+	}
+	defer root.Close()
+
+	entries, err := fs.ReadDir(root.FS(), ".")
 	if err != nil {
 		return models.OfflineManifestResponse{}, apperr.Internal(err)
 	}
@@ -121,12 +127,11 @@ func (a *App) OfflineManifest(ctx context.Context, query models.NearbyQuery) (mo
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".pmtiles") {
 			continue
 		}
-		fullPath := filepath.Join(a.cfg.OfflinePacksDir, entry.Name())
 		info, err := entry.Info()
 		if err != nil {
 			return models.OfflineManifestResponse{}, apperr.Internal(err)
 		}
-		hash, err := fileHash(fullPath)
+		hash, err := fileHash(root, entry.Name())
 		if err != nil {
 			return models.OfflineManifestResponse{}, apperr.Internal(err)
 		}
@@ -146,8 +151,8 @@ func (a *App) OfflineManifest(ctx context.Context, query models.NearbyQuery) (mo
 	}, nil
 }
 
-func fileHash(filename string) (string, error) {
-	file, err := os.Open(filename)
+func fileHash(root *os.Root, name string) (string, error) {
+	file, err := root.Open(name)
 	if err != nil {
 		return "", err
 	}

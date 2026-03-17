@@ -132,6 +132,11 @@ test("runs add-flow with promo textarea and exposes public API links in about", 
   await page.getByRole("button", { name: "О приложении" }).click();
   await expect(page).toHaveURL(/\/about$/);
   await expect(page.getByText("API", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "openapi.yaml" })).toHaveAttribute("href", "https://wifi.eval.su/openapi.yaml");
-  await expect(page.getByText("https://wifi.eval.su/api/v1")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Открыть API UI" })).toHaveAttribute("href", "http://127.0.0.1:4173/api-docs.html");
+  await expect(page.getByRole("link", { name: "openapi.yaml" })).toHaveAttribute("href", "http://127.0.0.1:4173/openapi.yaml");
+  await expect(page.getByText("http://127.0.0.1:4173/api/v1")).toBeVisible();
+
+  await page.goto("/api-docs.html");
+  await expect(page.getByText("Wifiyka API reference")).toBeVisible();
+  await expect(page.locator("#swagger-ui .information-container")).toBeVisible({ timeout: 20_000 });
 });

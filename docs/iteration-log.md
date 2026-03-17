@@ -110,3 +110,65 @@
 ### Risks
 - Даже после усиления кодовой ветки компас на отдельных браузерах зависит от реальной выдачи sensor events устройством; это нельзя полностью верифицировать внутри headless/e2e окружения.
 - Фоновая индикция кэша показывает lifecycle сохранения покрытия, но не отражает процент скачивания pack-файла, потому что текущий pipeline загружает файл целиком одним запросом.
+
+## 2026-03-17 21:58 MSK
+
+### Done
+- Репозиторий подготовлен под публичный GitHub: добавлены `README`, `CONTRIBUTING`, `SECURITY`, отдельные docs по установке/деплою и стеку, `CI`, `Dependabot`, `.gitattributes`, `.npmrc`, очищены tracked `*.tsbuildinfo`.
+- Для API добавлен Swagger-like UI: статическая страница `web/public/api-docs.html`, alias-маршруты `/api-docs` и `/swagger`, ссылка на UI выведена в раздел API внутри приложения.
+- Усилен security baseline: строгий JSON decode с запретом неизвестных полей, базовые security headers, серверные timeout’ы, более строгие права на offline dir, chi обновлён до `v5.2.2`.
+- Крупные файлы разнесены по ответственности:
+  - backend `places.go` разделён на query / mutation / votes / sync файлы;
+  - map style-конфигурация вынесена из `MapCanvas` в отдельный модуль.
+- Go toolchain baseline поднят до `go1.25.8` через `toolchain` directive, `Makefile`, CI и release script; `govulncheck` на этом toolchain стал зелёным.
+- Пакет выкачен на `hellor8g@185.225.32.121:/var/www/sergey/wifiyka/current`, на сервере выполнен `./deploy/build-release.sh`, процесс `wifiyka.service` перевыпущен через `Restart=always` с новым `MainPID`.
+- Проверки завершены успешно:
+  - `cd backend && GOTOOLCHAIN=go1.25.8+auto /usr/local/go/bin/go test ./...`
+  - `cd backend && GOTOOLCHAIN=go1.25.8+auto ../tmp/bin/govulncheck ./...`
+  - `cd backend && ../tmp/bin/gosec ./...`
+  - `cd web && npm_config_registry=https://registry.npmjs.org/ npm audit --json`
+  - `cd web && npm test -- --run`
+  - `cd web && npm run build`
+  - `cd web && npm run test:e2e`
+- Post-deploy проверка успешна:
+  - `https://wifi.eval.su/healthz` -> `200 {"status":"ok"}`
+  - `https://wifi.eval.su/openapi.yaml` -> `200`
+  - `https://wifi.eval.su/api-docs.html` -> новая API docs page
+  - `https://wifi.eval.su/swagger` -> `307 /api-docs.html`
+
+### Next
+- Если потребуется убрать внешнюю зависимость от CDN, зафиксировать локальную/self-hosted поставку `swagger-ui-dist` вместо загрузки с `jsdelivr`.
+- Отдельно прогнать manual QA на мобильном устройстве по `/api-docs.html`, add-flow и картографическим сценариям уже на проде.
+
+### Risks
+- Текущий Swagger-like UI загружает `swagger-ui-dist` с CDN во время открытия страницы; при блокировке внешних CDN raw-spec `/openapi.yaml` останется доступен, но визуальный UI может не отрисоваться.
+- Первый серверный build на новой версии Go toolchain скачивает `go1.25.8`; для изолированных окружений без внешнего доступа этот toolchain стоит предустановить отдельно.
+
+## 2026-03-17 22:32 MSK
+
+### Done
+- Swagger UI переведён на self-hosted поставку: `swagger-ui-dist` теперь копируется локальным build-скриптом в `web/public/swagger-ui`, страница `/api-docs.html` больше не зависит от CDN.
+- Place sheet дочищен по UI: убран видимый grip-блок сверху, drag-зона стала невидимой, share-action переработан из маленькой icon-only кнопки в полноценный CTA.
+- Legal-тексты вынесены из hardcoded React-страниц в отдельные install-time файлы `deploy/legal/privacy.txt` и `deploy/legal/consent-personal-data-email.txt`, backend теперь отдаёт их как raw `text/plain` через `/legal/...`.
+- Обновлены install/deploy инструкции и `.env.example`: добавлен `LEGAL_DOCS_DIR`, legal-файлы теперь описаны как обязательный шаг инсталляции и не хранятся в git history.
+- Локальный `backend/internal/static/webdist` пересинхронизирован с актуальным `web/dist`, чтобы embedded shell не отставал от публичной сборки.
+- Пакет выкачен на `hellor8g@185.225.32.121:/var/www/sergey/wifiyka/current`, на сервере выполнен `./deploy/build-release.sh`, `wifiyka.service` перезапущен с новым `MainPID`, а runtime `.env` дополнен `LEGAL_DOCS_DIR=/var/www/sergey/wifiyka/current/deploy/legal`.
+- Проверки завершены успешно:
+  - `cd backend && GOTOOLCHAIN=go1.25.8+auto /usr/local/go/bin/go test ./...`
+  - `cd web && npm test -- --run`
+  - `cd web && npm run build`
+  - `cd web && npm run test:e2e`
+- Post-deploy проверка успешна:
+  - `https://wifi.eval.su/healthz` -> `200 {"status":"ok"}`
+  - `https://wifi.eval.su/api-docs.html` -> self-hosted Swagger UI
+  - `https://wifi.eval.su/swagger` -> `307 /api-docs.html`
+  - `https://wifi.eval.su/legal/privacy.txt` -> `200 text/plain`
+  - `https://wifi.eval.su/legal/consent-personal-data-email.txt` -> `200 text/plain`
+
+### Next
+- Снять локальные headless-скриншоты основных сценариев и встроить их в `README`, чтобы репозиторий выглядел как готовый showcase.
+- После скриншотов зафиксировать финальный docs/README commit.
+
+### Risks
+- На проде сейчас лежат install-time placeholder legal files; перед публичным запуском их нужно заменить на реальные тексты оператора.
+- Legal docs не попадают в build-артефакты намеренно и зависят от runtime `LEGAL_DOCS_DIR`; если каталог не создан, UI покажет состояние `Документ не установлен`.

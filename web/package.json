@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
+    "sync:swagger-ui": "node ./scripts/sync-swagger-ui.mjs",
+    "dev": "npm run sync:swagger-ui && vite",
+    "build": "npm run sync:swagger-ui && tsc -b && vite build",
+    "preview": "npm run sync:swagger-ui && vite preview",
     "test": "vitest run src/**/*.test.ts src/**/*.test.tsx",
     "test:watch": "vitest src/**/*.test.ts src/**/*.test.tsx",
     "test:e2e": "npm run build && playwright test"
@@ -21,7 +22,8 @@
     "pmtiles": "^4.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.0"
+    "react-router-dom": "^6.30.0",
+    "swagger-ui-dist": "^5.32.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",

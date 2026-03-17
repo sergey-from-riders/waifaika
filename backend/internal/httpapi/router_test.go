@@ -7,11 +7,14 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"wifiyka/backend/internal/apperr"
 	"wifiyka/backend/internal/models"
+	"wifiyka/backend/internal/static"
 )
 
 type stubService struct {
@@ -102,7 +105,7 @@ func TestBootstrapSessionSetsCookie(t *testing.T) {
 			}, "raw-token", nil
 		},
 	}
-	router := New(service, nil, nil, "v_session", true)
+	router := New(service, nil, nil, nil, "v_session", true)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/session/bootstrap", http.NoBody)
 	rec := httptest.NewRecorder()
@@ -123,7 +126,7 @@ func TestMeReturnsErrorShape(t *testing.T) {
 			return models.MeResponse{}, apperr.Unauthorized("session is required")
 		},
 	}
-	router := New(service, nil, nil, "v_session", true)
+	router := New(service, nil, nil, nil, "v_session", true)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", http.NoBody)
 	rec := httptest.NewRecorder()
@@ -146,7 +149,7 @@ func TestMeReturnsErrorShape(t *testing.T) {
 }
 
 func TestOfflineManifestValidation(t *testing.T) {
-	router := New(stubService{}, nil, nil, "v_session", false)
+	router := New(stubService{}, nil, nil, nil, "v_session", false)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/offline/manifest", http.NoBody)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -175,7 +178,7 @@ func TestDeleteVoteRoute(t *testing.T) {
 			}, nil
 		},
 	}
-	router := New(service, nil, nil, "v_session", true)
+	router := New(service, nil, nil, nil, "v_session", true)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/places/place-1/vote", bytes.NewBufferString(`{"version":3}`))
 	req.AddCookie(&http.Cookie{Name: "v_session", Value: "token-1"})
@@ -196,12 +199,103 @@ func TestDeleteVoteRoute(t *testing.T) {
 }
 
 func TestDeleteVoteValidation(t *testing.T) {
-	router := New(stubService{}, nil, nil, "v_session", false)
+	router := New(stubService{}, nil, nil, nil, "v_session", false)
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/places/place-1/vote", bytes.NewBufferString(`{}`))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	router := New(stubService{}, nil, nil, nil, "v_session", true)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", http.NoBody)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Header().Get("Permissions-Policy") != "geolocation=(self)" {
+		t.Fatalf("expected Permissions-Policy header, got %q", rec.Header().Get("Permissions-Policy"))
+	}
+	if rec.Header().Get("Referrer-Policy") != "strict-origin-when-cross-origin" {
+		t.Fatalf("expected Referrer-Policy header, got %q", rec.Header().Get("Referrer-Policy"))
+	}
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("expected nosniff header, got %q", rec.Header().Get("X-Content-Type-Options"))
+	}
+	if rec.Header().Get("X-Frame-Options") != "DENY" {
+		t.Fatalf("expected X-Frame-Options header, got %q", rec.Header().Get("X-Frame-Options"))
+	}
+	if rec.Header().Get("Cross-Origin-Opener-Policy") != "same-origin" {
+		t.Fatalf("expected COOP header, got %q", rec.Header().Get("Cross-Origin-Opener-Policy"))
+	}
+	if rec.Header().Get("Strict-Transport-Security") == "" {
+		t.Fatalf("expected Strict-Transport-Security header for secure router")
+	}
+}
+
+func TestDecodeJSONRejectsUnknownFields(t *testing.T) {
+	router := New(stubService{}, nil, nil, nil, "v_session", false)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/email/start-bind",
+		bytes.NewBufferString(`{"email":"ceo@example.com","consent_accepted":true,"unexpected":"field"}`),
+	)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestSwaggerRedirects(t *testing.T) {
+	router := New(stubService{}, nil, nil, nil, "v_session", false)
+
+	for _, path := range []string{"/api-docs", "/swagger"} {
+		req := httptest.NewRequest(http.MethodGet, path, http.NoBody)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusTemporaryRedirect {
+			t.Fatalf("expected 307 for %s, got %d", path, rec.Code)
+		}
+		if location := rec.Header().Get("Location"); location != "/api-docs.html" {
+			t.Fatalf("expected redirect to /api-docs.html for %s, got %q", path, location)
+		}
+	}
+}
+
+func TestLegalDocsRoute(t *testing.T) {
+	tmpDir := t.TempDir()
+	privacyPath := filepath.Join(tmpDir, "privacy.txt")
+	if err := os.WriteFile(privacyPath, []byte("privacy-body"), 0o644); err != nil {
+		t.Fatalf("write privacy doc: %v", err)
+	}
+
+	legalDocs, err := static.NewLegalDocs(tmpDir)
+	if err != nil {
+		t.Fatalf("create legal docs handler: %v", err)
+	}
+	router := New(stubService{}, nil, nil, legalDocs, "v_session", false)
+
+	req := httptest.NewRequest(http.MethodGet, "/legal/privacy.txt", http.NoBody)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if body := rec.Body.String(); body != "privacy-body" {
+		t.Fatalf("expected privacy doc body, got %q", body)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/legal/missing.txt", http.NoBody)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing legal doc, got %d", rec.Code)
 	}
 }

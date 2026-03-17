@@ -1,155 +1,88 @@
-# Вайфайка
+# Wifiyka
 
-Вайфайка — mobile-first web app / PWA для crowdsourced-карты бесплатных Wi‑Fi точек. Проект построен как monorepo: статический React/Vite frontend, Go backend, PostgreSQL/PostGIS, офлайн-first sync через Dexie/outbox, legal pages и деплой под `nginx + systemd`.
+Wifiyka is a mobile-first map/PWA for crowdsourced Wi-Fi discovery. The repo is structured as a monorepo with a React/Vite frontend, a Go API, PostgreSQL/PostGIS storage, offline pack support via PMTiles, and production deployment templates for `nginx + systemd`.
 
-## Стек
+This repository can also be used as a base for other location-heavy applications: city guides, field collection tools, offline map viewers, place directories, local review maps, and similar products where map interaction, sync, and resilient mobile UX matter.
 
-- Frontend: React, TypeScript, Vite, Tailwind CSS, Radix Icons/Dialog, MapLibre GL JS, Dexie, service worker, web manifest
-- Backend: Go 1.24, chi, pgx, goose-compatible SQL migrations, structured logging
-- DB: PostgreSQL + PostGIS, UUID-only PK/FK, `version BIGINT` on mutable tables, snapshot version tables
-- Deploy: `nginx`, `systemd`, local docker compose for PostGIS + Mailpit
+## What is inside
 
-## Структура
+- React + TypeScript frontend optimized for mobile and installable as a PWA
+- Go backend with JSON API, session auth, sync endpoints, static serving, and SMTP-based email flows
+- PostgreSQL/PostGIS schema with versioned entities and offline-first sync semantics
+- Demo offline map assets and deployment templates for the current production shape
+- Public OpenAPI spec served from `/openapi.yaml`
+- Swagger-like API docs UI served from `/api-docs.html` with aliases `/api-docs` and `/swagger`
 
-- `backend/` — Go API, auth/session, sync, SMTP, static serving
-- `web/` — React PWA
-- `migrations/` — goose SQL migrations + seed
-- `docs/` — architecture и OpenAPI
-- `deploy/` — env templates, compose, nginx/systemd templates, release script
+## Stack
 
-## Быстрый старт локально
+- Frontend: React, TypeScript, Vite, Tailwind CSS, MapLibre GL JS, Dexie, Playwright, Vitest
+- Backend: Go 1.25.8, chi, pgx, goose-compatible SQL migrations
+- Data: PostgreSQL, PostGIS, PMTiles
+- Deploy: `nginx`, `systemd`, Docker Compose for local infra
 
-1. Поднять локальную инфраструктуру:
+## Docs
+
+- [Install and deploy guide](docs/install-and-deploy.md)
+- [Stack and reuse guide](docs/stack-and-reuse.md)
+- [Architecture overview](docs/architecture.md)
+- [OpenAPI source](docs/openapi.yaml)
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+
+## Quick Start
+
+1. Start local services:
 
 ```bash
 make dev-up
 ```
 
-2. Экспортировать окружение для backend:
+2. Export backend environment:
 
 ```bash
 export DATABASE_URL='postgres://postgres:postgres@127.0.0.1:54329/wifiyka?sslmode=disable'
 export BASE_URL='http://localhost:8098'
 export LISTEN_ADDR='127.0.0.1:8098'
-export STATIC_DIR='/home/sergei/wifiyka/web/dist'
-export OFFLINE_PACKS_DIR='/home/sergei/wifiyka/offline-packs'
+export STATIC_DIR="$(pwd)/web/dist"
+export OFFLINE_PACKS_DIR="$(pwd)/deploy/offline-packs"
 export OFFLINE_PACKS_BASE_URL='/offline-packs'
 ```
 
-3. Применить миграции:
+3. Apply migrations:
 
 ```bash
 make migrate
 ```
 
-4. Установить frontend зависимости, прогнать тесты и собрать `dist`:
+4. Install frontend dependencies and build the app:
 
 ```bash
 make web-install
-make web-test
-make web-build
+cd web && npm test -- --run
+cd web && npm run build
 ```
 
-5. Прогнать backend тесты и запустить API:
+5. Run backend checks and start the server:
 
 ```bash
-make backend-test
+cd backend && /usr/local/go/bin/go test ./...
 make run-backend
 ```
 
-После этого приложение будет доступно на `http://localhost:8098`.
+App URL: `http://localhost:8098`
 
-## Тесты
+## Quality Gates
 
-```bash
-make backend-test
-make web-test
-```
+- Frontend tests: `cd web && npm test -- --run`
+- Frontend build: `cd web && npm run build`
+- Backend tests: `cd backend && /usr/local/go/bin/go test ./...`
+- Keep `docs/openapi.yaml` and `web/public/openapi.yaml` in sync
 
-Frontend тестирует outbox/offline helpers и geolocation fallback. Backend тестирует токены и HTTP error/cookie contract.
+## Repository Notes
 
-## PWA и офлайн
+- `deploy/offline-packs/sochi.pmtiles` is a demo/offline asset kept in the repo intentionally.
+- `backend/internal/static/webdist/` contains embedded frontend artifacts needed for backend fallback serving.
+- The current deployment templates target `wifi.eval.su`, but the app UI now derives API/OpenAPI links from the active origin so the codebase is easier to reuse.
+- API docs are available both as raw spec (`/openapi.yaml`) and as a browser UI (`/api-docs.html`, `/swagger`).
 
-- `web/public/manifest.webmanifest` и `web/public/sw.js` делают приложение installable
-- shell кэшируется service worker'ом
-- при bootstrap приложение сразу просит геолокацию
-- при разрешении геопозиции приложение запрашивает nearby точки и автоматически пробует скачать офлайн-пакеты в радиусе 100 км
-- пользовательские изменения пишутся в Dexie (`my_places`, `my_votes`, `outbox`, `regions`)
-- при `online`, `focus` и ручном sync outbox отправляется на `/api/v1/sync/outbox`
-
-## Миграции и БД
-
-Основные таблицы:
-
-- `users`, `user_emails`, `sessions`, `email_magic_links`
-- `places`, `place_votes`, `place_reports`
-- `sync_operations`
-- version tables: `users_versions`, `user_emails_versions`, `places_versions`, `place_votes_versions`
-
-Все PK/FK — UUID. Для `places.geom` используется `GEOGRAPHY(POINT, 4326)`.
-
-## Офлайн-паки
-
-- backend читает pack metadata из `OFFLINE_PACKS_DIR`
-- endpoint `/api/v1/offline/manifest` отдаёт список `.pmtiles`
-- сами pack files доступны по `/offline-packs/*`
-- публичная OpenAPI-спецификация должна лежать в `web/public/openapi.yaml` и раздаваться по `/openapi.yaml`
-- release flow может либо использовать `STATIC_DIR`, либо запекать frontend в Go через копирование `web/dist` в `backend/internal/static/webdist`
-
-## Legal pages
-
-- `/privacy` — политика конфиденциальности
-- `/consent/personal-data-email` — отдельное согласие на обработку email
-
-В текстах стоят placeholders для наименования, адреса и email оператора. Их нужно заменить перед окончательным legal sign-off.
-
-## Прод-сборка
-
-```bash
-cd deploy
-./build-release.sh
-```
-
-`build-release.sh` перед сборкой синхронизирует `docs/openapi.yaml` -> `web/public/openapi.yaml`.
-
-Или пошагово:
-
-```bash
-make web-build
-make prepare-static
-cd backend && /usr/local/go/bin/go build -o ../dist/wifiyka-server ./cmd/server
-```
-
-## Прод-деплой под `wifi.eval.su`
-
-1. Разложить проект в `/var/www/sergey/wifiyka/current`
-2. Скопировать `deploy/.env.example` в `deploy/.env` и подставить реальные значения
-3. Создать БД `wifiyka`, применить миграции
-4. Скопировать `deploy/systemd/wifiyka.service` в `/etc/systemd/system/`
-5. Скопировать `deploy/nginx/wifi.eval.su.conf` в `/etc/nginx/vhosts/sergei/`
-6. Выпустить сертификат:
-
-```bash
-sudo certbot --nginx -d wifi.eval.su
-```
-
-7. Перезагрузить `nginx` и `systemd` unit
-
-Актуальные публичные URL после деплоя:
-
-- `https://wifi.eval.su/api/v1`
-- `https://wifi.eval.su/openapi.yaml`
-
-## Переменные окружения
-
-См. `deploy/.env.example`.
-
-Ключевые:
-
-- `DATABASE_URL`
-- `BASE_URL`
-- `LISTEN_ADDR`
-- `STATIC_DIR`
-- `OFFLINE_PACKS_DIR`
-- `OFFLINE_PACKS_BASE_URL`
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_FROM_NAME`
+For detailed setup, production release flow, and how to adapt this project into your own map product, use the docs listed above.

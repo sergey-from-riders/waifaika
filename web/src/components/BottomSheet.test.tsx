@@ -29,4 +29,17 @@ describe("BottomSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "Закрыть панель" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("renders an invisible drag zone instead of the visible grip", () => {
+    const onClose = vi.fn();
+
+    render(
+      <BottomSheet open={true} title="Точка" onClose={onClose}>
+        <p>Контент</p>
+      </BottomSheet>,
+    );
+
+    expect(screen.getByTestId("bottom-sheet-drag-zone")).toBeInTheDocument();
+    expect(screen.queryByTestId("bottom-sheet-grip")).not.toBeInTheDocument();
+  });
 });

@@ -67,8 +67,7 @@ import {
 } from "@/lib/types";
 import { bearingDegrees, cn, distanceBetweenMeters, normalizeDegrees } from "@/lib/utils";
 import { ActivityPage, AboutPage, PlainPage } from "@/pages/AppPages";
-import { ConsentPage } from "@/pages/ConsentPage";
-import { PrivacyPage } from "@/pages/PrivacyPage";
+import { LegalDocumentPage } from "@/pages/LegalDocumentPage";
 
 const MAP_RADIUS_KM = 100;
 const NEARBY_HINT_DISMISSED_KEY = "wifiyka-nearest-hint-dismissed";
@@ -1427,7 +1426,7 @@ function AppShell() {
             path="/privacy"
             element={
               <PlainPage title="Политика конфиденциальности" backTo="/about">
-                <PrivacyPage />
+                <LegalDocumentPage documentPath="/legal/privacy.txt" expectedFile="deploy/legal/privacy.txt" />
               </PlainPage>
             }
           />
@@ -1435,7 +1434,10 @@ function AppShell() {
             path="/consent/personal-data-email"
             element={
               <PlainPage title="Согласие на обработку email" backTo="/about">
-                <ConsentPage />
+                <LegalDocumentPage
+                  documentPath="/legal/consent-personal-data-email.txt"
+                  expectedFile="deploy/legal/consent-personal-data-email.txt"
+                />
               </PlainPage>
             }
           />

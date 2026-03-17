@@ -459,7 +459,7 @@ func (a *App) ensureOfflinePacksDir() error {
 	if strings.TrimSpace(a.cfg.OfflinePacksDir) == "" {
 		return nil
 	}
-	return os.MkdirAll(a.cfg.OfflinePacksDir, 0o755)
+	return os.MkdirAll(a.cfg.OfflinePacksDir, 0o750)
 }
 
 func conflictIfNoRows(err error, message string) error {

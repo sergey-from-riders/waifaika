@@ -2,6 +2,8 @@ ROOT := $(CURDIR)
 BACKEND_DIR := $(ROOT)/backend
 WEB_DIR := $(ROOT)/web
 STATIC_EMBED_DIR := $(BACKEND_DIR)/internal/static/webdist
+GOTOOLCHAIN ?= go1.25.8+auto
+GO := GOTOOLCHAIN=$(GOTOOLCHAIN) /usr/local/go/bin/go
 
 .PHONY: help web-install web-build web-test backend-test prepare-static build migrate dev-up dev-down run-backend
 
@@ -28,7 +30,7 @@ web-test:
 	cd $(WEB_DIR) && . "$$HOME/.nvm/nvm.sh" && npm test
 
 backend-test:
-	cd $(BACKEND_DIR) && /usr/local/go/bin/go test ./...
+	cd $(BACKEND_DIR) && $(GO) test ./...
 
 prepare-static:
 	rm -rf $(STATIC_EMBED_DIR)
@@ -36,10 +38,10 @@ prepare-static:
 	cp -R $(WEB_DIR)/dist/. $(STATIC_EMBED_DIR)/
 
 build: web-build prepare-static
-	cd $(BACKEND_DIR) && /usr/local/go/bin/go build -o $(ROOT)/dist/wifiyka-server ./cmd/server
+	cd $(BACKEND_DIR) && $(GO) build -o $(ROOT)/dist/wifiyka-server ./cmd/server
 
 migrate:
-	cd $(BACKEND_DIR) && /usr/local/go/bin/go run ./cmd/server migrate
+	cd $(BACKEND_DIR) && $(GO) run ./cmd/server migrate
 
 dev-up:
 	cd $(ROOT)/deploy && docker compose up -d
@@ -48,4 +50,4 @@ dev-down:
 	cd $(ROOT)/deploy && docker compose down -v
 
 run-backend:
-	cd $(BACKEND_DIR) && /usr/local/go/bin/go run ./cmd/server
+	cd $(BACKEND_DIR) && $(GO) run ./cmd/server

@@ -250,6 +250,13 @@ describe("AboutPage", () => {
       "href",
       "/consent/personal-data-email",
     );
-    expect(screen.getByRole("link", { name: "openapi.yaml" })).toHaveAttribute("href", "https://wifi.eval.su/openapi.yaml");
+    expect(screen.getByRole("link", { name: "Открыть API UI" })).toHaveAttribute(
+      "href",
+      `${window.location.origin}/api-docs.html`,
+    );
+    expect(screen.getByRole("link", { name: "openapi.yaml" })).toHaveAttribute(
+      "href",
+      `${window.location.origin}/openapi.yaml`,
+    );
   });
 });

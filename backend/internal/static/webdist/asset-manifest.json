@@ -4,7 +4,7 @@
     "name": "map"
   },
   "index.html": {
-    "file": "assets/index-DHfkR-Gi.js",
+    "file": "assets/index-CV57t_Wa.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -15,11 +15,11 @@
       "src/features/map/MapCanvas.tsx"
     ],
     "css": [
-      "assets/index-ByOF7fEm.css"
+      "assets/index-C1AoBR01.css"
     ]
   },
   "src/features/map/MapCanvas.tsx": {
-    "file": "assets/MapCanvas-CD7drqfF.js",
+    "file": "assets/MapCanvas-DnWjhIAl.js",
     "name": "MapCanvas",
     "src": "src/features/map/MapCanvas.tsx",
     "isDynamicEntry": true,

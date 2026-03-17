@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wifiyka API Docs</title>
+    <link rel="stylesheet" href="/swagger-ui/swagger-ui.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f2f5fb;
+        --panel: rgba(255, 255, 255, 0.92);
+        --panel-border: rgba(16, 24, 40, 0.08);
+        --text: #0f172a;
+        --muted: #516075;
+        --brand: #0f7ef7;
+        --brand-2: #0b4fb4;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Inter", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(15, 126, 247, 0.12), transparent 28rem),
+          linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+      }
+
+      .hero {
+        max-width: 76rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 1rem;
+      }
+
+      .hero-card {
+        border: 1px solid var(--panel-border);
+        background: var(--panel);
+        backdrop-filter: blur(18px);
+        border-radius: 1.75rem;
+        padding: 1.5rem;
+        box-shadow: 0 22px 70px rgba(15, 23, 42, 0.08);
+      }
+
+      .eyebrow {
+        margin: 0;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--brand);
+      }
+
+      h1 {
+        margin: 0.45rem 0 0;
+        font-size: clamp(2rem, 4vw, 3.2rem);
+        line-height: 0.98;
+      }
+
+      .hero-copy {
+        max-width: 48rem;
+        margin: 0.9rem 0 0;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.6;
+      }
+
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.1rem;
+      }
+
+      .link-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border-radius: 999px;
+        border: 1px solid rgba(15, 126, 247, 0.14);
+        background: rgba(255, 255, 255, 0.94);
+        color: var(--brand-2);
+        text-decoration: none;
+        font-weight: 700;
+        padding: 0.8rem 1rem;
+      }
+
+      .swagger-shell {
+        max-width: 76rem;
+        margin: 0 auto 3rem;
+        padding: 0 1.25rem 2rem;
+      }
+
+      #swagger-ui {
+        border-radius: 1.75rem;
+        overflow: hidden;
+        border: 1px solid var(--panel-border);
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 28px 80px rgba(15, 23, 42, 0.08);
+      }
+
+      .swagger-ui .topbar {
+        display: none;
+      }
+
+      .swagger-ui .info {
+        margin: 0;
+        padding: 1.5rem 1.5rem 0;
+      }
+
+      .swagger-ui .scheme-container {
+        box-shadow: none;
+        background: linear-gradient(180deg, rgba(15, 126, 247, 0.05), rgba(15, 126, 247, 0.02));
+      }
+
+      @media (max-width: 720px) {
+        .hero {
+          padding: 1.2rem 0.85rem 0.9rem;
+        }
+
+        .swagger-shell {
+          padding: 0 0.85rem 1.5rem;
+        }
+
+        .hero-card {
+          border-radius: 1.2rem;
+          padding: 1.1rem;
+        }
+
+        #swagger-ui {
+          border-radius: 1.2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="hero">
+      <div class="hero-card">
+        <p class="eyebrow">API docs</p>
+        <h1>Wifiyka API reference</h1>
+        <p class="hero-copy">
+          Полностью self-hosted интерфейс в стиле Swagger для текущего `openapi.yaml`. Подходит и как удобная точка входа для ручной проверки API, и как публичная документация для интеграций.
+        </p>
+        <div class="links">
+          <a id="api-base-link" class="link-pill" href="/api/v1">API base</a>
+          <a id="openapi-link" class="link-pill" href="/openapi.yaml">OpenAPI YAML</a>
+          <a class="link-pill" href="/">Back to app</a>
+        </div>
+      </div>
+    </section>
+
+    <main class="swagger-shell">
+      <div id="swagger-ui"></div>
+    </main>
+
+    <script src="/swagger-ui/swagger-ui-bundle.js"></script>
+    <script>
+      const openapiUrl = new URL("/openapi.yaml", window.location.origin).toString();
+      const apiBaseUrl = new URL("/api/v1", window.location.origin).toString();
+
+      document.getElementById("openapi-link").href = openapiUrl;
+      document.getElementById("api-base-link").href = apiBaseUrl;
+
+      window.ui = SwaggerUIBundle({
+        url: openapiUrl,
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        displayRequestDuration: true,
+        defaultModelsExpandDepth: -1,
+        docExpansion: "list",
+        filter: true,
+        persistAuthorization: true,
+        tryItOutEnabled: true,
+      });
+    </script>
+  </body>
+  </html>

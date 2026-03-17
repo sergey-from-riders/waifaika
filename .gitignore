@@ -12,8 +12,10 @@ backend/internal/static/webdist/sw.js
 web/node_modules/
 web/dist/
 web/.vite/
+web/public/swagger-ui/
 web/playwright-report/
 web/test-results/
 deploy/.env
+*.tsbuildinfo
 *.log
 .DS_Store

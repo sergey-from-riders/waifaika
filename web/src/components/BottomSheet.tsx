@@ -27,7 +27,9 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const dragActiveRef = useRef(false);
   const dragStartRef = useRef<number | null>(null);
+  const dragOffsetRef = useRef(0);
 
   useEffect(() => {
     if (!open) {
@@ -55,47 +57,51 @@ export function BottomSheet({
     transition: isDragging ? "none" : "transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms ease",
   };
 
+  const resetDrag = () => {
+    dragActiveRef.current = false;
+    dragOffsetRef.current = 0;
+    setDragY(0);
+    setIsDragging(false);
+    dragStartRef.current = null;
+  };
+
+  const releasePointer = (event: ReactPointerEvent<HTMLElement>) => {
+    if (
+      typeof event.currentTarget.hasPointerCapture === "function" &&
+      typeof event.currentTarget.releasePointerCapture === "function" &&
+      event.currentTarget.hasPointerCapture(event.pointerId)
+    ) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
   const dragHandlers = {
     onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
       dragStartRef.current = event.clientY;
+      dragActiveRef.current = true;
       setIsDragging(true);
       if (typeof event.currentTarget.setPointerCapture === "function") {
         event.currentTarget.setPointerCapture(event.pointerId);
       }
     },
     onPointerMove: (event: ReactPointerEvent<HTMLElement>) => {
-      if (!isDragging || dragStartRef.current == null) {
+      if (!dragActiveRef.current || dragStartRef.current == null) {
         return;
       }
       const delta = Math.max(0, event.clientY - dragStartRef.current);
+      dragOffsetRef.current = delta;
       setDragY(delta);
     },
     onPointerUp: (event: ReactPointerEvent<HTMLElement>) => {
-      if (dragY > CLOSE_THRESHOLD) {
+      if (dragOffsetRef.current > CLOSE_THRESHOLD) {
         onClose();
       }
-      setDragY(0);
-      setIsDragging(false);
-      dragStartRef.current = null;
-      if (
-        typeof event.currentTarget.hasPointerCapture === "function" &&
-        typeof event.currentTarget.releasePointerCapture === "function" &&
-        event.currentTarget.hasPointerCapture(event.pointerId)
-      ) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
+      resetDrag();
+      releasePointer(event);
     },
     onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => {
-      setDragY(0);
-      setIsDragging(false);
-      dragStartRef.current = null;
-      if (
-        typeof event.currentTarget.hasPointerCapture === "function" &&
-        typeof event.currentTarget.releasePointerCapture === "function" &&
-        event.currentTarget.hasPointerCapture(event.pointerId)
-      ) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
+      resetDrag();
+      releasePointer(event);
     },
   };
 
@@ -115,18 +121,14 @@ export function BottomSheet({
         )}
         style={sheetStyle}
       >
-        <div className="flex justify-center px-4 pt-3">
-          <div
-            data-testid="bottom-sheet-grip"
-            aria-hidden="true"
-            className="flex h-10 w-16 items-center justify-center rounded-full bg-[var(--panel-muted)] text-[var(--app-muted)]"
-            {...dragHandlers}
-          >
-            <div className="h-1.5 w-9 rounded-full bg-current/70" />
-          </div>
-        </div>
+        <div
+          data-testid="bottom-sheet-drag-zone"
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-5 touch-none"
+          {...dragHandlers}
+        />
 
-        <div className="flex items-center justify-between gap-3 px-4 pb-1 pt-1">
+        <div className="flex items-center justify-between gap-3 px-4 pb-1 pt-5">
           <div className="flex min-w-0 items-center gap-3">
             <div className="min-w-0">
               {title ? <h2 className="truncate text-lg font-semibold">{title}</h2> : null}
