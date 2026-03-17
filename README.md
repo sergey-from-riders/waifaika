@@ -1,63 +1,67 @@
 # Wifiyka
 
-Wifiyka is a mobile-first map/PWA for crowdsourced Wi-Fi discovery. The repo is structured as a monorepo with a React/Vite frontend, a Go API, PostgreSQL/PostGIS storage, offline pack support via PMTiles, and production deployment templates for `nginx + systemd`.
+[English version](README.en.md)
 
-This repository can also be used as a base for other location-heavy applications: city guides, field collection tools, offline map viewers, place directories, local review maps, and similar products where map interaction, sync, and resilient mobile UX matter.
+Wifiyka это mobile-first карта и PWA для поиска и обмена рабочими Wi-Fi точками. Репозиторий устроен как monorepo: React/Vite frontend, Go API, PostgreSQL/PostGIS, offline pack support через PMTiles и production-шаблоны под `nginx + systemd`.
 
-## Screenshots
+Этот проект можно использовать не только как карту Wi-Fi, но и как основу для других location-heavy приложений: городских гидов, полевых сервисов, офлайн-карт, каталогов мест, review-карт и любых продуктов, где важны карта, синхронизация и устойчивый mobile UX.
 
-Captured locally with headless Google Chrome against the built app.
+## Скриншоты
 
-| Discovery map | Place card |
+Снято локально через headless Google Chrome на собранной версии приложения.
+
+| Карта | Карточка точки |
 | --- | --- |
 | ![Map home](docs/screenshots/map-home.png) | ![Place sheet](docs/screenshots/place-sheet.png) |
-| Nearby hint, offline shell, mobile controls, and bottom navigation. | Share CTA, coordinates copy, direction card, and voting states. |
+| Nearby hint, офлайн-shell, mobile controls и нижняя навигация. | Share CTA, копирование координат, карточка направления и голосование. |
 
-| Add flow | Activity feed |
+| Add flow | Активность |
 | --- | --- |
 | ![Add flow](docs/screenshots/add-flow.png) | ![Activity](docs/screenshots/activity.png) |
-| Address lookup, add form, and promo field in the create flow. | User-owned places and actions collected in one mobile-first screen. |
+| Поиск адреса, форма добавления и promo field в create-flow. | Личные точки и действия в одном mobile-first экране. |
 
-| About and API links | Self-hosted API docs |
+| О приложении и API | Self-hosted API docs |
 | --- | --- |
 | ![About page](docs/screenshots/about.png) | ![API docs](docs/screenshots/api-docs.png) |
-| Install hints, account actions, legal links, and API entry points. | Swagger-style UI served from the app domain without CDN dependencies. |
+| Установка, аккаунт, legal links и входные точки в API. | Swagger-style UI, который обслуживается с домена приложения без CDN. |
 
-## What is inside
+## Что внутри
 
-- React + TypeScript frontend optimized for mobile and installable as a PWA
-- Go backend with JSON API, session auth, sync endpoints, static serving, and SMTP-based email flows
-- PostgreSQL/PostGIS schema with versioned entities and offline-first sync semantics
-- Demo offline map assets and deployment templates for the current production shape
-- Install-time legal documents served from external `deploy/legal/*.txt` files instead of hardcoded page content
-- Public OpenAPI spec served from `/openapi.yaml`
-- Self-hosted Swagger-like API docs UI served from `/api-docs.html` with aliases `/api-docs` and `/swagger`
+- React + TypeScript frontend, оптимизированный под mobile и installable PWA
+- Go backend с JSON API, session auth, sync endpoints, static serving и SMTP email flows
+- PostgreSQL/PostGIS схема с versioned entities и offline-first синхронизацией
+- Demo offline map assets и deploy templates под текущую production-форму
+- Install-time legal documents через внешние `deploy/legal/*.txt`, а не зашитые тексты в коде
+- Публичная OpenAPI-спецификация по `/openapi.yaml`
+- Self-hosted Swagger-like API docs UI по `/api-docs.html` с alias-маршрутами `/api-docs` и `/swagger`
 
-## Stack
+## Стек
 
 - Frontend: React, TypeScript, Vite, Tailwind CSS, MapLibre GL JS, Dexie, Playwright, Vitest
 - Backend: Go 1.25.8, chi, pgx, goose-compatible SQL migrations
 - Data: PostgreSQL, PostGIS, PMTiles
-- Deploy: `nginx`, `systemd`, Docker Compose for local infra
+- Deploy: `nginx`, `systemd`, Docker Compose для локальной infra
 
-## Docs
+## Документация
 
+- [English README](README.en.md)
 - [Install and deploy guide](docs/install-and-deploy.md)
 - [Stack and reuse guide](docs/stack-and-reuse.md)
 - [Architecture overview](docs/architecture.md)
+- [Community post templates](docs/community-posts.md)
 - [OpenAPI source](docs/openapi.yaml)
 - [Contributing guide](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
-## Quick Start
+## Быстрый старт
 
-1. Start local services:
+1. Поднимите локальную инфраструктуру:
 
 ```bash
 make dev-up
 ```
 
-2. Export backend environment:
+2. Экспортируйте backend environment:
 
 ```bash
 export DATABASE_URL='postgres://postgres:postgres@127.0.0.1:54329/wifiyka?sslmode=disable'
@@ -69,7 +73,7 @@ export OFFLINE_PACKS_DIR="$(pwd)/deploy/offline-packs"
 export OFFLINE_PACKS_BASE_URL='/offline-packs'
 ```
 
-3. Create install-time legal text files:
+3. Создайте install-time legal text files:
 
 ```bash
 mkdir -p deploy/legal
@@ -77,13 +81,13 @@ $EDITOR deploy/legal/privacy.txt
 $EDITOR deploy/legal/consent-personal-data-email.txt
 ```
 
-4. Apply migrations:
+4. Примените миграции:
 
 ```bash
 make migrate
 ```
 
-5. Install frontend dependencies and build the app:
+5. Установите frontend dependencies и соберите приложение:
 
 ```bash
 make web-install
@@ -91,28 +95,28 @@ cd web && npm test -- --run
 cd web && npm run build
 ```
 
-6. Run backend checks and start the server:
+6. Прогоните backend checks и запустите сервер:
 
 ```bash
 cd backend && /usr/local/go/bin/go test ./...
 make run-backend
 ```
 
-App URL: `http://localhost:8098`
+URL приложения: `http://localhost:8098`
 
-## Quality Gates
+## Контроль качества
 
 - Frontend tests: `cd web && npm test -- --run`
 - Frontend build: `cd web && npm run build`
 - Backend tests: `cd backend && /usr/local/go/bin/go test ./...`
-- Keep `docs/openapi.yaml` and `web/public/openapi.yaml` in sync
+- Держите `docs/openapi.yaml` и `web/public/openapi.yaml` синхронизированными
 
-## Repository Notes
+## Что важно про репозиторий
 
-- `deploy/offline-packs/sochi.pmtiles` is a demo/offline asset kept in the repo intentionally.
-- `backend/internal/static/webdist/` contains embedded frontend artifacts needed for backend fallback serving.
-- `deploy/legal/*.txt` is intentionally externalized and gitignored so every installation can inject its own legal text without leaving it in repository history.
-- The current deployment templates target `wifi.eval.su`, but the app UI now derives API/OpenAPI links from the active origin so the codebase is easier to reuse.
-- API docs are available both as raw spec (`/openapi.yaml`) and as a browser UI (`/api-docs.html`, `/swagger`).
+- `deploy/offline-packs/sochi.pmtiles` это намеренно оставленный demo/offline asset.
+- `backend/internal/static/webdist/` содержит embedded frontend artifacts для backend fallback serving.
+- `deploy/legal/*.txt` намеренно вынесены наружу и игнорируются git, чтобы каждая установка могла подложить свои legal texts без следов в истории репозитория.
+- Текущие deploy templates ориентированы на `wifi.eval.su`, но UI теперь выводит API/OpenAPI links от активного origin, поэтому код легче переиспользовать.
+- API docs доступны и как raw spec (`/openapi.yaml`), и как browser UI (`/api-docs.html`, `/swagger`).
 
-For detailed setup, production release flow, and how to adapt this project into your own map product, use the docs listed above.
+Для установки, production release flow и адаптации проекта под собственный map product используйте документы выше.
