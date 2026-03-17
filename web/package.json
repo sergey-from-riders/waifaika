@@ -21,7 +21,7 @@
     "maplibre-gl": "^5.6.0",
     "pmtiles": "^4.3.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^19.2.4",
     "react-router-dom": "^6.30.0",
     "swagger-ui-dist": "^5.32.1"
   },
@@ -32,7 +32,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.13.10",
     "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react-swc": "^3.8.0",
     "autoprefixer": "^10.4.21",
     "jsdom": "^26.0.0",
