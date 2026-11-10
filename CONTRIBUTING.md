@@ -3,7 +3,7 @@
 ## Перед началом
 
 - Проверьте [README.md](README.md), [docs/install-and-deploy.md](docs/install-and-deploy.md) и [docs/stack-and-reuse.md](docs/stack-and-reuse.md).
-- Для backend нужен Go `1.25.8+` и PostgreSQL/PostGIS.
+- Для backend нужен Go `1.26.10+` и PostgreSQL/PostGIS.
 - Для frontend нужен Node.js `22+` и `npm`.
 
 ## Локальный цикл разработки

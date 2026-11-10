@@ -84,6 +84,9 @@ func shouldServeIndexFallback(path string) bool {
 }
 
 func applyCacheHeaders(w http.ResponseWriter, path string) {
+	if path == "/manifest.webmanifest" {
+		w.Header().Set("Content-Type", "application/manifest+json")
+	}
 	switch {
 	case strings.HasPrefix(path, "/assets/"):
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")

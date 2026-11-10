@@ -1,5 +1,4 @@
 const APP_CACHE = "wifiyka-shell-__BUILD_VERSION__";
-const MANUAL_PACK_CACHE = "wifiyka-manual-packs";
 const APP_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -118,8 +117,8 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(shellAsset(request));
   } else if (
     request.mode === "navigate" &&
-    (/^\/(?:tech|about|activity|regions|profile)?\/?$/.test(url.pathname) ||
-      url.pathname.startsWith("/place/"))
+    (/^\/(?:tech|about|activity|regions|profile|me|my-data|offline|privacy)?\/?$/.test(url.pathname) ||
+      url.pathname.startsWith("/place/") || url.pathname === "/consent/personal-data-email")
   ) {
     event.respondWith(
       (async () => {

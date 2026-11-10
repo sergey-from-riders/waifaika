@@ -1,0 +1,12 @@
+# Riders Geo / Wifiyka
+
+An open-source geographic PWA with a working Wi-Fi map, preloaded PMTiles maps,
+local edits and durable synchronization. Hotel/campus/park applications are
+adaptation scenarios; indoor positioning and floor routing are not implemented.
+
+## Documentation
+
+- [Product and architecture](https://wifi.eval.su/tech)
+- [API documentation](https://wifi.eval.su/api-docs.html)
+- [OpenAPI contract](https://wifi.eval.su/openapi.yaml)
+- [Source and deployment](https://github.com/sergey-from-riders/waifaika)

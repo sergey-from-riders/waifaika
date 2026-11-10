@@ -241,3 +241,15 @@
 - risks: browser storage eviction; first visit/address search/email need internet;
   single-node runtime; legacy timestamp feed requires bootstrap. Full details and
   changed files are in `docs/release-2026-11-10.md`.
+
+## 2026-11-10 — Source archive policy and final polish
+
+- done: removed GitHub Actions workflow and Dependabot configuration at the owner's
+  request; all verification remains local. Improved /tech contrast, robots/sitemap
+  discovery, offline aliases and the accessible name of the cache button.
+- validation: /tech Lighthouse locally reached accessibility 100, best practices
+  100, SEO 100 (performance 98); live map reached 100/100/100 (performance 57 in
+  throttled Chromium). WebGL startup remains expensive on the emulated CPU; these
+  figures are measured results, not a physical-device performance guarantee.
+- next: complete final publication checks and push with repository Actions disabled.
+- risks: same offline/device/single-node limits as the previous entry.

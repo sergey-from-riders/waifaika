@@ -111,7 +111,7 @@ export function MapPage(props: MapPageProps) {
             type="button"
             onClick={props.onClearOffline}
             disabled={props.offlineActionBusy}
-            aria-label={props.offlineActionBusy ? "Очистить офлайн" : `Очистить офлайн (${props.offlineUsageLabel})`}
+            aria-labelledby="offline-clear-action offline-cache-size"
             data-testid="clear-offline-button"
             className={cn(
               "pointer-events-auto relative inline-flex h-11 min-w-[4.8rem] items-center justify-center gap-2 rounded-full border bg-[color:color-mix(in_srgb,var(--panel-solid)_92%,transparent)] px-3 text-[13px] font-semibold text-[var(--app-fg)] backdrop-blur transition-transform duration-300 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
@@ -121,7 +121,8 @@ export function MapPage(props: MapPageProps) {
             )}
           >
             <Trash2 className={cn("h-4 w-4 shrink-0", props.offlineActionBusy || props.offlineCacheState === "caching" ? "animate-pulse" : "")} strokeWidth={2.2} />
-            <span>{props.offlineActionBusy ? "..." : props.offlineUsageLabel}</span>
+            <span id="offline-clear-action" className="sr-only">Очистить офлайн</span>
+            <span id="offline-cache-size">{props.offlineActionBusy ? "..." : props.offlineUsageLabel}</span>
           </button>
         </div>
       </div>

@@ -166,7 +166,7 @@ asset cache is deliberately retained. Users should not need to clear device data
 
 Tests that use a real database require `WIFI_TEST_DATABASE_URL` pointing to a
 **disposable migrated PostGIS database**, never production. The suite intentionally
-installs a temporary failing trigger to prove transactional rollback. CI creates
-its own PostGIS service. For browser checks use `npx playwright install chromium`
+installs a temporary failing trigger to prove transactional rollback. Create a separate local PostGIS service. GitHub Actions is intentionally
+disabled: this repository stores source only; run checks locally. For browser checks use `npx playwright install chromium`
 and `npx playwright test` after building; local installations can set
 `PLAYWRIGHT_CHROME_PATH` to their Chrome executable.

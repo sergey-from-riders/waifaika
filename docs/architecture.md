@@ -76,8 +76,9 @@ memory is bounded. Email delivery has connection/deadline limits and rejects
 header injection; missing SMTP in production returns an error, not false success.
 
 Secrets stay in external environment files. Install-specific legal texts and map
-packages are deployment inputs. Dependency audits run alongside unit, database
-integration and browser checks. These controls reduce known risks; they do not
+packages are deployment inputs. Dependency audits run locally alongside unit, database
+integration and browser checks. GitHub stores source only; Actions and scheduled
+dependency updates are intentionally disabled. These controls reduce known risks; they do not
 constitute a claim that future defects or vulnerabilities are impossible.
 
 ## Product and platform limits

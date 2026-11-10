@@ -2,7 +2,7 @@ ROOT := $(CURDIR)
 BACKEND_DIR := $(ROOT)/backend
 WEB_DIR := $(ROOT)/web
 STATIC_EMBED_DIR := $(BACKEND_DIR)/internal/static/webdist
-GOTOOLCHAIN ?= go1.25.8+auto
+GOTOOLCHAIN ?= go1.26.10+auto
 GO := GOTOOLCHAIN=$(GOTOOLCHAIN) /usr/local/go/bin/go
 
 .PHONY: help web-install web-build web-test backend-test prepare-static build migrate dev-up dev-down run-backend
