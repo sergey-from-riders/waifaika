@@ -276,3 +276,30 @@
   The video is loaded on demand online; the interactive demo is in the offline
   shell. Existing storage, device and indoor-positioning limitations still apply.
 - changed files: see `docs/release-2026-11-10.md` for the complete source list.
+
+## 2026-11-10 — Functional first screen and all four scenarios
+
+- done: replaced the decorative "Территория сохранена" hero with an interactive
+  golf map showing a measured initial distance of 1,000 m. Added working object
+  selection, distance/bearing updates, movement, pause/resume and reset to golf,
+  hotel, campus and city examples. Removed the park scenario. All four have
+  direct URLs and share the same tested component and scenario model.
+- video: recorded real UI interactions for all four scenarios, including the
+  initial 1,000 m, movement, alternate objects and scenario switching. A prominent
+  first-screen button opens the video; the player also offers a download link.
+- validation: 33 unit tests and 28 browser tests pass across iPhone/Pixel light
+  and dark profiles. Tests cover the geodesic 1,000 m, selections, pause/resume,
+  reset, deep-link reload, the working hero and all four routes offline.
+  Production build passes. The browser was also checked at 390 × 844.
+- production: server build and service restart succeeded; `/healthz`, `/readyz`,
+  `/tech` and all four demo routes return 200. The new H.264 recording is 41.43 s,
+  1280 × 720, 705,094 bytes; range delivery returns 206 and live browser playback
+  succeeds. Poster and captions return 200. Service-worker release
+  `2437295280cffa1c` updates the previous installed shell after reload.
+- next: no pending runtime changes in this iteration. Real territory data and
+  device positioning require a separate implementation and field validation.
+  GitHub Actions remain disabled; verification is run locally.
+- risks: coordinates and plans are demonstrations, not real-device GPS or indoor
+  navigation. The player needs a network connection; interactive examples work
+  offline after the application shell is installed.
+- changed files: complete iteration file list in `docs/release-2026-11-10.md`.

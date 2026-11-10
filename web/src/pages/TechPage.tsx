@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   ArrowUpRight,
   ArrowRight,
-  MapPin,
   Wifi,
   Navigation,
   Download,
@@ -13,47 +12,14 @@ import {
   Globe2,
   ChevronDown,
 } from "lucide-react";
+import { ScenarioExplorer } from "@/features/geo-demo/ScenarioExplorer";
+import { SCENARIOS, type ScenarioId } from "@/features/geo-demo/scenarios";
 import "./tech.css";
 
-const scenarios = [
-  {
-    name: "Город",
-    title: "Найти связь. И остаться на связи.",
-    text: "Открытая карта Wi-Fi: точки рядом, условия доступа, отзывы о работе сети. Этот сценарий уже доступен в приложении.",
-    places: ["Кофейня", "Библиотека", "Площадь"],
-    status: "Работает сейчас",
-    icon: Wifi,
-  },
-  {
-    name: "Отель",
-    title: "Всё на территории — в кармане гостя.",
-    text: "Ресепшен, ресторан, бассейн и корпуса на своей карте. Для внедрения добавляем план территории, категории и контент; для этажей — отдельную модель здания и маршрутов.",
-    places: ["Ресепшен", "Ресторан", "Бассейн"],
-    status: "Сценарий внедрения",
-    icon: MapPin,
-  },
-  {
-    name: "Кампус",
-    title: "Помочь человеку найти нужное место.",
-    text: "Учебные корпуса, мастерские, сервисы и места встреч. Геоданные и офлайн-пакеты становятся основой приложения вашей территории.",
-    places: ["Корпус А", "Мастерская", "Библиотека"],
-    status: "Сценарий внедрения",
-    icon: Layers,
-  },
-  {
-    name: "Гольф-клуб",
-    title: "Клубный дом, поле и сервисы — рядом.",
-    text: "Покажите гостю его положение, нужный объект и расстояние до него: клубный дом, старт поля или прокат инвентаря. План территории сохраняется заранее и остаётся доступен без связи.",
-    places: ["Клубный дом", "Поле № 1", "Прокат"],
-    status: "Сценарий внедрения",
-    icon: Navigation,
-  },
-];
-
 export default function TechPage() {
-  const [scenario, setScenario] = useState(0);
+  const [scenario, setScenario] = useState<ScenarioId>("golf");
   const [step, setStep] = useState(0);
-  const current = scenarios[scenario];
+  const current = SCENARIOS.find((item) => item.id === scenario)!;
   useEffect(() => {
     document.title = "Геоприложение для вашей территории — Вайфайка / Riders";
     document
@@ -107,11 +73,11 @@ export default function TechPage() {
               устанавливается на телефон и сохраняет нужное с собой.
             </p>
             <div className="tech-actions">
-              <a className="tech-primary" href="/">
-                Попробовать Wi-Fi-карту <ArrowUpRight size={18} />
+              <a className="tech-primary" href="#demo">
+                Смотреть видео <ArrowRight size={18} />
               </a>
-              <a className="tech-secondary" href="#demo">
-                Посмотреть, как это работает <ArrowRight size={18} />
+              <a className="tech-secondary" href="/demo/golf">
+                Открыть интерактивную карту <ArrowUpRight size={18} />
               </a>
             </div>
             <p className="tech-footnote">
@@ -120,36 +86,7 @@ export default function TechPage() {
             </p>
           </div>
           <div className="tech-hero-visual">
-            <div className="tech-grid-map" aria-hidden="true">
-              <div className="tech-river" />
-              <div className="tech-green" />
-              <div className="tech-map-road road-a" />
-              <div className="tech-map-road road-b" />
-              <span className="tech-map-label">ВАША ТЕРРИТОРИЯ</span>
-              <span className="tech-pin pin-one">
-                <Wifi size={20} />
-              </span>
-              <span className="tech-pin pin-two">
-                <MapPin size={20} />
-              </span>
-              <span className="tech-pin pin-three">
-                <Navigation size={20} />
-              </span>
-              <svg viewBox="0 0 500 500" className="tech-map-path">
-                <path d="M115 350 L115 225 Q115 210 135 210 L290 210 L290 130" />
-              </svg>
-            </div>
-            <div className="tech-map-card">
-              <span className="tech-live-dot" />
-              <div>
-                <strong>Территория сохранена</strong>
-                <span>Карта и точки доступны без интернета</span>
-              </div>
-              <Download size={21} />
-            </div>
-            <div className="tech-coordinate">
-              43.5855° N / 39.7231° E <span>КОНЦЕПТ ПРИМЕНЕНИЯ</span>
-            </div>
+            <ScenarioExplorer compact />
           </div>
         </section>
         <div className="tech-principles">
@@ -171,79 +108,84 @@ export default function TechPage() {
           </span>
         </div>
         <section className="tech-section tech-video-section" id="demo">
-          <div className="tech-section-head"><p className="tech-eyebrow">В ДЕЙСТВИИ / ПОЛМИНУТЫ</p><h2>Где вы.<br/>Где объект.<br/><em>Сколько до него.</em></h2><p>На примере гольф-клуба: приложение показывает положение посетителя, выделяет клубный дом и пересчитывает расстояние при движении.</p></div>
-          <video className="tech-demo-video" controls playsInline preload="none" poster="/demo/golf-poster.jpg" aria-label="Демонстрация положения посетителя и расстояния до клубного дома"><source src="/demo/golf-navigation.mp4" type="video/mp4"/><track kind="captions" src="/demo/golf-ru.vtt" srcLang="ru" label="Русский" default/>Ваш браузер не поддерживает видео. <a href="/demo/golf-navigation.mp4">Скачать ролик</a></video>
-          <div className="tech-demo-caption"><p>Запись демонстрационного режима: условная территория и смоделированные координаты. Расстояние — по прямой; построение маршрута не показывается.</p><a href="/demo/golf">Открыть интерактивный пример <ArrowUpRight size={17}/></a></div>
+          <div className="tech-section-head">
+            <p className="tech-eyebrow">ВИДЕО / ЧЕТЫРЕ СЦЕНАРИЯ</p>
+            <h2>
+              Гольф-клуб.
+              <br />
+              <em>1 000 метров от вас.</em>
+            </h2>
+            <p>
+              Посмотрите запись работы приложения: выбор объекта, положение
+              посетителя и расстояние. Затем — отель, кампус и город на той же
+              карте.
+            </p>
+          </div>
+          <video
+            className="tech-demo-video"
+            controls
+            playsInline
+            preload="none"
+            poster="/demo/territory-scenarios-poster.jpg"
+            aria-label="Видео: гольф-клуб в 1000 метрах, отель, кампус и город"
+          >
+            <source src="/demo/territory-scenarios.mp4" type="video/mp4" />
+            <track
+              kind="captions"
+              src="/demo/territory-scenarios-ru.vtt"
+              srcLang="ru"
+              label="Русский"
+            />
+            Ваш браузер не поддерживает видео.{" "}
+            <a href="/demo/territory-scenarios.mp4">Скачать запись</a>
+          </video>
+          <div className="tech-demo-caption">
+            <p>
+              Запись работающего интерфейса. Территории и координаты
+              демонстрационные; расстояния рассчитываются по прямой.
+            </p>
+            <a href="/demo/territory-scenarios.mp4" download>
+              Скачать видео <Download size={17} />
+            </a>
+          </div>
         </section>
         <section className="tech-section" id="scenarios">
           <div className="tech-section-head">
-            <p className="tech-eyebrow">01 / ПРИМЕНЕНИЕ</p>
+            <p className="tech-eyebrow">01 / ПОПРОБУЙТЕ САМИ</p>
             <h2>
-              Место меняется.
+              Четыре сценария.
               <br />
-              Основа остаётся.
+              <em>Одна понятная карта.</em>
             </h2>
             <p>
-              Начинаем с задачи посетителя: найти, понять, сохранить. Состав
-              данных и интерфейс подстраиваем под вашу территорию.
+              Переключайте сценарии, нажимайте на объекты и запускайте движение.
+              Положение, карточка и расстояние меняются сразу.
             </p>
           </div>
-          <div
-            className="tech-tabs"
-            role="tablist"
-            aria-label="Сценарий применения"
-          >
-            {scenarios.map((s, i) => (
-              <button
-                role="tab"
-                aria-selected={scenario === i}
-                aria-controls="scenario-panel"
-                id={`scenario-${i}`}
-                key={s.name}
-                onClick={() => setScenario(i)}
-              >
-                {s.name}
-                <ArrowUpRight size={16} />
-              </button>
-            ))}
-          </div>
-          <div
-            id="scenario-panel"
-            role="tabpanel"
-            aria-labelledby={`scenario-${scenario}`}
-            className="tech-scenario"
-          >
+          <div className="tech-scenario-intro">
             <div>
-              <span className="tech-tag">{current.status}</span>
+              <span className="tech-tag">{current.name}</span>
               <h3>{current.title}</h3>
-              <p>{current.text}</p>
-              <a href={scenario === 0 ? "/" : "#launch"}>
-                {scenario === 0
-                  ? "Открыть работающий пример"
-                  : "Как запустить такой сценарий"}
-                <ArrowRight size={17} />
-              </a>
+              <p>{current.description}</p>
             </div>
-            <div
-              className="tech-scenario-map"
-              aria-label={`Схема: ${current.places.join(", ")}`}
-            >
-              <span className="tech-schematic-label">СХЕМА ПРИМЕНЕНИЯ</span>
-              <div className="tech-campus-block block-a" />
-              <div className="tech-campus-block block-b" />
-              <div className="tech-campus-block block-c" />
-              {current.places.map((place, i) => (
-                <div className={`tech-place place-${i}`} key={place}>
-                  <current.icon size={18} />
-                  <span>{place}</span>
-                </div>
+            <div className="tech-scenario-benefits">
+              {current.features.map((feature) => (
+                <span key={feature}>
+                  <ShieldCheck size={16} />
+                  {feature}
+                </span>
               ))}
-              <div className="tech-you">
-                <span />
-                Вы здесь
-              </div>
+              <a href={`/demo/${scenario}`}>
+                Открыть на весь экран <ArrowUpRight size={16} />
+              </a>
+              {scenario === "city" && (
+                <a href="/">
+                  Открыть действующую Wi-Fi-карту <ArrowUpRight size={16} />
+                </a>
+              )}
             </div>
           </div>
+          <ScenarioExplorer onScenarioChange={setScenario} />
         </section>
         <section className="tech-section tech-offline" id="offline">
           <div className="tech-section-head">

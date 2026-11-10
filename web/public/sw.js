@@ -117,8 +117,12 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(shellAsset(request));
   } else if (
     request.mode === "navigate" &&
-    (/^\/(?:tech|about|activity|regions|profile|me|my-data|offline|privacy)?\/?$/.test(url.pathname) ||
-      url.pathname.startsWith("/place/") || url.pathname === "/consent/personal-data-email" || url.pathname === "/demo/golf")
+    (/^\/(?:tech|about|activity|regions|profile|me|my-data|offline|privacy)?\/?$/.test(
+      url.pathname,
+    ) ||
+      url.pathname.startsWith("/place/") ||
+      url.pathname === "/consent/personal-data-email" ||
+      /^\/demo\/(golf|hotel|campus|city)\/?$/.test(url.pathname))
   ) {
     event.respondWith(
       (async () => {

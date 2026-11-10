@@ -3,11 +3,11 @@ import ReactDOM from "react-dom/client";
 
 import { registerServiceWorker } from "@/lib/pwa";
 const Page = React.lazy(() =>
-  window.location.pathname.replace(/\/$/, "") === "/demo/golf"
+  /^\/demo\/(golf|hotel|campus|city)\/?$/.test(window.location.pathname)
     ? import("@/pages/GeoDemo")
     : window.location.pathname.replace(/\/$/, "") === "/tech"
-    ? import("@/pages/TechPage")
-    : import("@/app/App").then((module) => ({ default: module.App })),
+      ? import("@/pages/TechPage")
+      : import("@/app/App").then((module) => ({ default: module.App })),
 );
 registerServiceWorker();
 import "@/styles.css";

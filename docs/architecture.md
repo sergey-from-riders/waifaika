@@ -106,16 +106,25 @@ offline reload, local voting and reconnection. Keep database backups and the
 previous binary/assets before deployment. Migration 005 is additive; an older
 binary can run with the added nullable column for code rollback.
 
-## Golf demonstration
+## Interactive territory examples
 
-`/demo/golf` is a separate presentation route with a schematic SVG territory and
-synthetic visitor coordinates. It reuses the production distance and bearing
-functions, showing 2.3 km changing to 943 m. It does not request GPS or modify
-production places. The dashed line is a straight-line direction, not routing.
-The demo module and plan are included in the offline application shell.
+The first screen of `/tech` uses the same `ScenarioExplorer` component as the
+full-page examples at `/demo/golf`, `/demo/hotel`, `/demo/campus` and `/demo/city`.
+Scenario data is isolated in `features/geo-demo/scenarios.ts`; rendering and
+movement state are shared rather than copied across pages. Native buttons expose
+selection state, object details, pause/resume and reset. Full-page scenario
+selection updates the URL, so reloading keeps the selected scenario.
 
-`/tech#demo` embeds a 27-second screen recording of that UI, with a poster and
-Russian captions. The recording is served on demand and is not part of the
-automatically downloaded offline shell. The interactive demo works offline once
-the updated shell has been installed. These demonstrations do not establish
-indoor positioning or real-device GPS accuracy.
+The golf club is placed exactly 1,000 metres from the synthetic visitor using a
+spherical destination calculation. Production distance and bearing functions
+compute the displayed measurements. Selecting another object resets movement;
+pausing preserves progress; movement stops after covering 75% of the distance.
+All coordinates and plans are explicitly labelled as examples. No live GPS or
+production-place changes occur in this demo. Lines show straight-line direction,
+not a computed walking route.
+
+All four modules and SVG plans are in the offline shell. Network status is read
+from browser online/offline events. The recorded walkthrough, poster and optional
+Russian captions are served on demand at `/tech#demo`; the video is not forced
+into the offline download. The initial frame visibly shows the golf club at
+1,000 metres, followed by object selection and the other three scenarios.
