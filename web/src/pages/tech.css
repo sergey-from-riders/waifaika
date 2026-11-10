@@ -186,7 +186,7 @@
   transform: rotate(26deg);
   border-radius: 70px;
 }
-.tech-park {
+.tech-green {
   position: absolute;
   width: 210px;
   height: 170px;
@@ -1083,3 +1083,5 @@
 }
 
 .tech-you { color: #354e43; }
+
+.tech-demo-video{display:block;width:100%;background:#e6edde;border:1px solid #d4decc;border-radius:18px;aspect-ratio:16/10;object-fit:contain}.tech-demo-caption{display:flex;align-items:center;justify-content:space-between;gap:30px;padding-top:15px}.tech-demo-caption p{max-width:720px;font-size:11px;color:var(--muted)}.tech-demo-caption a{font-size:12px;display:flex;align-items:center;gap:8px;white-space:nowrap;font-weight:600}@media(max-width:700px){.tech-demo-caption{display:block}.tech-demo-caption a{margin-top:18px;white-space:normal}.tech-tabs button{font-size:11px;padding:12px 7px}}

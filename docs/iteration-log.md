@@ -253,3 +253,26 @@
   figures are measured results, not a physical-device performance guarantee.
 - next: complete final publication checks and push with repository Actions disabled.
 - risks: same offline/device/single-node limits as the previous entry.
+
+## 2026-11-10 — Golf location and distance demonstration
+
+- done: removed the park scenario, added golf-club positioning and `/demo/golf`.
+  The schematic visitor position and straight-line distance update from 2.3 km
+  to 943 m. `/tech#demo` contains a real 27-second screen recording of that demo,
+  a poster and Russian captions. Synthetic coordinates are explicitly labelled.
+  GitHub Actions were disabled and verified in both repository settings.
+- validation: 31 frontend tests and the production build pass. All 20 browser
+  tests pass in iPhone/Pixel light/dark Chromium profiles, including the golf
+  timeline, restart, mobile width and real offline demo reload. H.264 playback
+  verified in the browser; 1280×720, 27.27 seconds, 486,905 bytes.
+- production: rebuilt on the server and restarted `wifiyka.service`; the live
+  `/healthz`, `/readyz`, `/tech` and `/demo/golf` return 200. Video range requests
+  return 206 with `video/mp4`; poster and caption files return 200. Published
+  service-worker release: `7087f7c394ed1317`. The live demo opens and runs.
+- next: push the prepared commits after the owner's GitHub identity verification
+  completes. Actions are disabled in the repository settings already.
+- risks: the golf plan and movement are simulated, not a commissioned territory
+  or a GPS field test. Distances are straight-line measurements, not routing.
+  The video is loaded on demand online; the interactive demo is in the offline
+  shell. Existing storage, device and indoor-positioning limitations still apply.
+- changed files: see `docs/release-2026-11-10.md` for the complete source list.

@@ -75,6 +75,12 @@ test("installed shell, deep links and local edits survive a real offline reload"
     document.documentElement.scrollWidth,
   ]);
   expect(widths[1]).toBeLessThanOrEqual(widths[0]);
+  await page.goto("/demo/golf");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Как найти объект");
+  await page.getByRole("button", { name: "Смотреть демонстрацию" }).click();
+  await expect(page.getByTestId("demo-distance")).toHaveText("2.3 км", { timeout: 12_000 });
+  await page.reload();
+  await expect(page.getByTestId("demo-distance")).toHaveText("—");
   await page.goto("/api-docs.html");
   await expect(page.getByText("Wifiyka API reference")).toBeVisible();
   await context.setOffline(false);

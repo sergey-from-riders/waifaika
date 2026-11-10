@@ -20,7 +20,7 @@ const scenarios = [
     name: "Город",
     title: "Найти связь. И остаться на связи.",
     text: "Открытая карта Wi-Fi: точки рядом, условия доступа, отзывы о работе сети. Этот сценарий уже доступен в приложении.",
-    places: ["Кофейня", "Библиотека", "Парк"],
+    places: ["Кофейня", "Библиотека", "Площадь"],
     status: "Работает сейчас",
     icon: Wifi,
   },
@@ -41,10 +41,10 @@ const scenarios = [
     icon: Layers,
   },
   {
-    name: "Парк",
-    title: "Своя карта там, где связь нестабильна.",
-    text: "Тропы, входы и полезные точки для посетителей. Подготовленный пакет карты хранится на устройстве; новые сведения отправляются после подключения.",
-    places: ["Вход", "Смотровая", "Пикник"],
+    name: "Гольф-клуб",
+    title: "Клубный дом, поле и сервисы — рядом.",
+    text: "Покажите гостю его положение, нужный объект и расстояние до него: клубный дом, старт поля или прокат инвентаря. План территории сохраняется заранее и остаётся доступен без связи.",
+    places: ["Клубный дом", "Поле № 1", "Прокат"],
     status: "Сценарий внедрения",
     icon: Navigation,
   },
@@ -60,7 +60,7 @@ export default function TechPage() {
       .querySelector('meta[name="description"]')
       ?.setAttribute(
         "content",
-        "Геоприложение с офлайн-картой: город, отель, кампус или парк. PWA, собственные геоданные, открытый API и прозрачная архитектура.",
+        "Геоприложение с офлайн-картой: город, отель, кампус или гольф-клуб. Положение посетителя, объекты и расстояния. PWA, собственные геоданные и открытый API.",
       );
   }, []);
   return (
@@ -103,15 +103,15 @@ export default function TechPage() {
             </h1>
             <p className="tech-lead">
               Карта, полезные места и ориентирование — в одном приложении. Для
-              города, отеля, кампуса или парка. Открывается по ссылке,
+              города, отеля, кампуса или гольф-клуба. Открывается по ссылке,
               устанавливается на телефон и сохраняет нужное с собой.
             </p>
             <div className="tech-actions">
               <a className="tech-primary" href="/">
                 Попробовать Wi-Fi-карту <ArrowUpRight size={18} />
               </a>
-              <a className="tech-secondary" href="#scenarios">
-                Примерить к своей задаче <ArrowRight size={18} />
+              <a className="tech-secondary" href="#demo">
+                Посмотреть, как это работает <ArrowRight size={18} />
               </a>
             </div>
             <p className="tech-footnote">
@@ -122,7 +122,7 @@ export default function TechPage() {
           <div className="tech-hero-visual">
             <div className="tech-grid-map" aria-hidden="true">
               <div className="tech-river" />
-              <div className="tech-park" />
+              <div className="tech-green" />
               <div className="tech-map-road road-a" />
               <div className="tech-map-road road-b" />
               <span className="tech-map-label">ВАША ТЕРРИТОРИЯ</span>
@@ -170,6 +170,11 @@ export default function TechPage() {
             Открытый исходный код
           </span>
         </div>
+        <section className="tech-section tech-video-section" id="demo">
+          <div className="tech-section-head"><p className="tech-eyebrow">В ДЕЙСТВИИ / ПОЛМИНУТЫ</p><h2>Где вы.<br/>Где объект.<br/><em>Сколько до него.</em></h2><p>На примере гольф-клуба: приложение показывает положение посетителя, выделяет клубный дом и пересчитывает расстояние при движении.</p></div>
+          <video className="tech-demo-video" controls playsInline preload="none" poster="/demo/golf-poster.jpg" aria-label="Демонстрация положения посетителя и расстояния до клубного дома"><source src="/demo/golf-navigation.mp4" type="video/mp4"/><track kind="captions" src="/demo/golf-ru.vtt" srcLang="ru" label="Русский" default/>Ваш браузер не поддерживает видео. <a href="/demo/golf-navigation.mp4">Скачать ролик</a></video>
+          <div className="tech-demo-caption"><p>Запись демонстрационного режима: условная территория и смоделированные координаты. Расстояние — по прямой; построение маршрута не показывается.</p><a href="/demo/golf">Открыть интерактивный пример <ArrowUpRight size={17}/></a></div>
+        </section>
         <section className="tech-section" id="scenarios">
           <div className="tech-section-head">
             <p className="tech-eyebrow">01 / ПРИМЕНЕНИЕ</p>

@@ -1,7 +1,7 @@
 # Riders Geo / Wifiyka
 
 An open-source geographic PWA with a working Wi-Fi map, preloaded PMTiles maps,
-local edits and durable synchronization. Hotel/campus/park applications are
+local edits and durable synchronization. Hotel/campus/golf-club applications are
 adaptation scenarios; indoor positioning and floor routing are not implemented.
 
 ## Documentation

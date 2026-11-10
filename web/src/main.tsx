@@ -3,7 +3,9 @@ import ReactDOM from "react-dom/client";
 
 import { registerServiceWorker } from "@/lib/pwa";
 const Page = React.lazy(() =>
-  window.location.pathname.replace(/\/$/, "") === "/tech"
+  window.location.pathname.replace(/\/$/, "") === "/demo/golf"
+    ? import("@/pages/GeoDemo")
+    : window.location.pathname.replace(/\/$/, "") === "/tech"
     ? import("@/pages/TechPage")
     : import("@/app/App").then((module) => ({ default: module.App })),
 );

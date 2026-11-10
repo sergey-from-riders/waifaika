@@ -82,6 +82,6 @@
 ## Territory scenarios
 
 See [/tech](https://wifi.eval.su/tech) for the public geographic PWA presentation.
-Hotel grounds, campuses and parks can reuse the offline shell, PMTiles storage,
+Hotel grounds, campuses and golf clubs can reuse the offline shell, PMTiles storage,
 place API and durable synchronization. Indoor floors and routing require their
 own data model and positioning design; the Wi-Fi example does not provide them.

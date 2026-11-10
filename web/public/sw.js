@@ -118,7 +118,7 @@ self.addEventListener("fetch", (event) => {
   } else if (
     request.mode === "navigate" &&
     (/^\/(?:tech|about|activity|regions|profile|me|my-data|offline|privacy)?\/?$/.test(url.pathname) ||
-      url.pathname.startsWith("/place/") || url.pathname === "/consent/personal-data-email")
+      url.pathname.startsWith("/place/") || url.pathname === "/consent/personal-data-email" || url.pathname === "/demo/golf")
   ) {
     event.respondWith(
       (async () => {

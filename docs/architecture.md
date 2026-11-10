@@ -2,7 +2,7 @@
 
 The production example is a Wi-Fi map. The reusable foundation is a geographic
 PWA: a map, place records, local edits and reconciliation with an authoritative
-server. `/tech` explains hotel, campus and park adaptations without presenting
+server. `/tech` explains hotel, campus and golf-club adaptations without presenting
 indoor routing or floor detection as existing features.
 
 ## Boundaries and deployment
@@ -105,3 +105,17 @@ when receipt persistence fails. Browser tests include a real service worker,
 offline reload, local voting and reconnection. Keep database backups and the
 previous binary/assets before deployment. Migration 005 is additive; an older
 binary can run with the added nullable column for code rollback.
+
+## Golf demonstration
+
+`/demo/golf` is a separate presentation route with a schematic SVG territory and
+synthetic visitor coordinates. It reuses the production distance and bearing
+functions, showing 2.3 km changing to 943 m. It does not request GPS or modify
+production places. The dashed line is a straight-line direction, not routing.
+The demo module and plan are included in the offline application shell.
+
+`/tech#demo` embeds a 27-second screen recording of that UI, with a poster and
+Russian captions. The recording is served on demand and is not part of the
+automatically downloaded offline shell. The interactive demo works offline once
+the updated shell has been installed. These demonstrations do not establish
+indoor positioning or real-device GPS accuracy.
