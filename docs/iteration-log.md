@@ -303,3 +303,26 @@
   navigation. The player needs a network connection; interactive examples work
   offline after the application shell is installed.
 - changed files: complete iteration file list in `docs/release-2026-11-10.md`.
+
+## 2026-11-10 — Screen recording of the actual Wi-Fi application
+
+- done: recorded the main `https://wifi.eval.su/` application, including "Где я",
+  the user-position marker, the real Кофефорния place, and measured distances
+  from 1 km through 600 m to 250 m. The primary `/tech` player now uses this
+  30.32-second, 1280 × 900 H.264 screen recording with captions and a poster.
+- fix: the decorative location marker previously intercepted clicks on a nearby
+  place pin. It now allows pointer events through. The live recording exposed
+  this bug and passed after the fix; a local browser regression covers the user
+  and a place occupying exactly the same coordinates.
+- validation: 33 unit tests, the production build and 32 browser regressions
+  pass. The separate live capture checks location activation, object selection
+  and distances. The server build/restart passed; health, readiness, poster and
+  captions return 200, video ranges return 206. Published release:
+  `bde62e122311ad89`; live browser playback succeeds.
+- next: no pending changes in this recording iteration. GitHub Actions remain
+  disabled; a physical-phone GPS field test is separate from this screen capture.
+- risks: this is a recording of the actual deployed application and real place
+  data, with browser-emulated user coordinates, explicitly labelled throughout.
+  It is not a physical-phone GPS field test or a recording of the schematic
+  territory examples. It does not create places or cast votes.
+- changed files: complete iteration file list in `docs/release-2026-11-10.md`.

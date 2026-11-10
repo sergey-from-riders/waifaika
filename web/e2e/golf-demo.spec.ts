@@ -112,7 +112,7 @@ test("tech hero is operable and video and scenario links are available", async (
   await expect(page).toHaveURL(/#demo$/);
   await expect(page.locator("video source")).toHaveAttribute(
     "src",
-    "/demo/territory-scenarios.mp4",
+    "/demo/wifi-location.mp4",
   );
   const scenarios = page.locator("#scenarios");
   await scenarios.getByRole("button", { name: "Кампус", exact: true }).click();

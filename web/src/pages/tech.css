@@ -1149,7 +1149,7 @@
   max-width: 440px;
 }
 .tech-demo-video {
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 64 / 45;
 }
 .tech-scenario-intro {
   display: grid;

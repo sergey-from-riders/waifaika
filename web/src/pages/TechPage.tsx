@@ -109,16 +109,15 @@ export default function TechPage() {
         </div>
         <section className="tech-section tech-video-section" id="demo">
           <div className="tech-section-head">
-            <p className="tech-eyebrow">ВИДЕО / ЧЕТЫРЕ СЦЕНАРИЯ</p>
+            <p className="tech-eyebrow">ЗАПИСЬ ЭКРАНА / WIFI.EVAL.SU</p>
             <h2>
-              Гольф-клуб.
+              Вы на карте.
               <br />
-              <em>1 000 метров от вас.</em>
+              <em>Объект — в 1 км.</em>
             </h2>
             <p>
-              Посмотрите запись работы приложения: выбор объекта, положение
-              посетителя и расстояние. Затем — отель, кампус и город на той же
-              карте.
+              Основное приложение в работе: кнопка «Где я», положение пользователя,
+              карточка реальной Wi-Fi-точки и изменение расстояния с 1 км до 250 м.
             </p>
           </div>
           <video
@@ -126,25 +125,25 @@ export default function TechPage() {
             controls
             playsInline
             preload="none"
-            poster="/demo/territory-scenarios-poster.jpg"
-            aria-label="Видео: гольф-клуб в 1000 метрах, отель, кампус и город"
+            poster="/demo/wifi-location-poster.jpg"
+            aria-label="Запись экрана wifi.eval.su: геолокация и расстояние до объекта"
           >
-            <source src="/demo/territory-scenarios.mp4" type="video/mp4" />
+            <source src="/demo/wifi-location.mp4" type="video/mp4" />
             <track
               kind="captions"
-              src="/demo/territory-scenarios-ru.vtt"
+              src="/demo/wifi-location-ru.vtt"
               srcLang="ru"
               label="Русский"
             />
             Ваш браузер не поддерживает видео.{" "}
-            <a href="/demo/territory-scenarios.mp4">Скачать запись</a>
+            <a href="/demo/wifi-location.mp4">Скачать запись</a>
           </video>
           <div className="tech-demo-caption">
             <p>
-              Запись работающего интерфейса. Территории и координаты
-              демонстрационные; расстояния рассчитываются по прямой.
+              Записано на wifi.eval.su. Карта и точки настоящие; координаты
+              пользователя воспроизводятся браузером для записи. Расстояния — по прямой.
             </p>
-            <a href="/demo/territory-scenarios.mp4" download>
+            <a href="/demo/wifi-location.mp4" download>
               Скачать видео <Download size={17} />
             </a>
           </div>

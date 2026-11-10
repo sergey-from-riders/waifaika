@@ -25,6 +25,19 @@ async function expectNoOverlap(first: Locator, second: Locator) {
   expect(overlaps).toBe(false);
 }
 
+test("location indicator does not block a place at the same coordinates", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("location-button")).toHaveText("Вы");
+  // The fixture's user and Surf Coffee occupy the same coordinates. This tap
+  // falls inside both the location circle and the visible place pin's stem.
+  await page.getByRole("button", { name: "Surf Coffee", exact: true }).click({
+    position: { x: 29, y: 65 },
+  });
+  await expect(page.getByRole("heading", { name: "Surf Coffee", exact: true })).toBeVisible();
+  await expect(page.getByText("0 м", { exact: true })).toBeVisible();
+  await expect(page.getByText("Точка находится от вас")).toBeVisible();
+});
+
 test("opens map root, deep link, copies share URL and closes place sheet", async ({ page, baseURL }) => {
   await page.goto("/");
 

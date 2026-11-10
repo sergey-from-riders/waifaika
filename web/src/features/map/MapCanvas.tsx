@@ -300,6 +300,8 @@ function createPlaceMarker(label: string, isActive: boolean, theme: "light" | "d
 function createLocationMarker(theme: "light" | "dark") {
   const node = document.createElement("div");
   node.setAttribute("aria-hidden", "true");
+  // The position indicator is decorative; nearby place pins must stay clickable.
+  node.style.pointerEvents = "none";
   node.style.position = "relative";
   node.style.width = "36px";
   node.style.height = "36px";
