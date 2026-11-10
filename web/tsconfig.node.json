@@ -3,8 +3,13 @@
     "composite": true,
     "skipLibCheck": true,
     "module": "ESNext",
-    "moduleResolution": "Node",
-    "allowSyntheticDefaultImports": true
+    "moduleResolution": "Bundler",
+    "allowSyntheticDefaultImports": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./.cache/config"
   },
-  "include": ["vite.config.ts", "tailwind.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "tailwind.config.ts"
+  ]
 }

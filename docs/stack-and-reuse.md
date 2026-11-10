@@ -24,7 +24,7 @@
 
 ### Backend
 
-- Go 1.25.8
+- Go 1.26.10
 - chi router
 - pgx
 - structured JSON API
@@ -78,3 +78,10 @@
 - Keep API contracts in `docs/openapi.yaml` and sync the public copy before every release.
 - Treat offline assets and embedded frontend artifacts as generated or deploy-time data, not hand-edited source files.
 - Split large files by responsibility early. In this repo the large map-style config and place domain logic are already separated to keep the codebase maintainable.
+
+## Territory scenarios
+
+See [/tech](https://wifi.eval.su/tech) for the public geographic PWA presentation.
+Hotel grounds, campuses and parks can reuse the offline shell, PMTiles storage,
+place API and durable synchronization. Indoor floors and routing require their
+own data model and positioning design; the Wi-Fi example does not provide them.

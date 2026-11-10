@@ -73,8 +73,7 @@ func (a *App) SyncChanges(ctx context.Context, sessionToken string, since time.T
 			updated_at
 		FROM places
 		WHERE updated_at >= $1
-		  AND status <> 'deleted'
-		ORDER BY updated_at ASC
+		ORDER BY updated_at ASC LIMIT 1000
 	`, since)
 	if err != nil {
 		return models.SyncChangesResponse{}, apperr.Internal(err)
@@ -90,6 +89,9 @@ func (a *App) SyncChanges(ctx context.Context, sessionToken string, since time.T
 		places = append(places, place)
 	}
 
+	if err := rows.Err(); err != nil {
+		return models.SyncChangesResponse{}, apperr.Internal(err)
+	}
 	myVotes, err := a.listMyVotes(ctx, record.User.UserID)
 	if err != nil {
 		return models.SyncChangesResponse{}, err
@@ -102,9 +104,10 @@ func (a *App) SyncChanges(ctx context.Context, sessionToken string, since time.T
 	}
 
 	return models.SyncChangesResponse{
-		Places:     places,
-		MyVotes:    filteredVotes,
-		ServerTime: time.Now().UTC(),
+		RequiresBootstrap: true,
+		Places:            places,
+		MyVotes:           filteredVotes,
+		ServerTime:        time.Now().UTC(),
 	}, nil
 }
 

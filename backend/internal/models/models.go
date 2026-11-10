@@ -192,8 +192,10 @@ type SyncBootstrapResponse struct {
 	ServerTime time.Time     `json:"server_time"`
 }
 
+// Legacy advisory feed: timestamps do not encode commit order or vote tombstones.
 type SyncChangesResponse struct {
-	Places     []Place     `json:"places"`
-	MyVotes    []PlaceVote `json:"my_votes"`
-	ServerTime time.Time   `json:"server_time"`
+	RequiresBootstrap bool        `json:"requires_bootstrap"`
+	Places            []Place     `json:"places"`
+	MyVotes           []PlaceVote `json:"my_votes"`
+	ServerTime        time.Time   `json:"server_time"`
 }

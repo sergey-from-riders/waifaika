@@ -1,6 +1,4 @@
-const APP_CACHE = "wifiyka-shell-v6";
-const DATA_CACHE = "wifiyka-data-v4";
-const PACK_CACHE = "wifiyka-offline-packs-v4";
+const APP_CACHE = "wifiyka-shell-__BUILD_VERSION__";
 const MANUAL_PACK_CACHE = "wifiyka-manual-packs";
 const APP_ASSETS = [
   "/",
@@ -51,133 +49,84 @@ async function discoverBuildAssets() {
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
-      const buildAssets = await discoverBuildAssets();
-      if (buildAssets.length === 0) {
-        throw new Error("sw manifest discovery returned no build assets");
-      }
+      const assets = await discoverBuildAssets();
+      if (!assets.length) throw new Error("Build manifest unavailable");
       const cache = await caches.open(APP_CACHE);
-      await cache.addAll(Array.from(new Set([...APP_ASSETS, ...buildAssets])));
+      await cache.addAll([...new Set([...APP_ASSETS, ...assets])]);
       await self.skipWaiting();
     })(),
   );
 });
-
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      const keys = await caches.keys();
+      // Keep the previous shell for already-open tabs. Never delete another app's caches.
+      const shells = (await caches.keys()).filter(
+        (k) => k.startsWith("wifiyka-shell-") && k !== APP_CACHE,
+      );
+      const obsolete = (await caches.keys()).filter(
+        (k) =>
+          k.startsWith("wifiyka-data-") ||
+          k.startsWith("wifiyka-offline-packs-"),
+      );
       await Promise.all(
-        keys
-          .filter((key) => ![APP_CACHE, DATA_CACHE, PACK_CACHE, MANUAL_PACK_CACHE].includes(key))
-          .map((key) => caches.delete(key)),
+        [...shells.slice(0, -1), ...obsolete].map((k) => caches.delete(k)),
       );
       await self.clients.claim();
     })(),
   );
 });
-
-async function cacheFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  if (cached) {
-    return cached;
-  }
+async function shellAsset(request) {
+  const cache = await caches.open(APP_CACHE);
+  // Precache requests and module requests can have different Origin/Accept headers.
+  // These are immutable public assets; their bytes do not vary by account/header.
+  const cached =
+    (await cache.match(request, { ignoreVary: true })) ||
+    (await caches.match(request, { ignoreVary: true }));
+  if (cached) return cached;
   const response = await fetch(request);
-  if (request.method === "GET" && response.ok) {
-    await cache.put(request, response.clone());
+  if (response.ok) {
+    try {
+      await cache.put(request, response.clone());
+    } catch {
+      /* Storage pressure must not break online use. */
+    }
   }
   return response;
 }
-
-async function networkFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  try {
-    const response = await fetch(request);
-    if (request.method === "GET" && response.ok) {
-      await cache.put(request, response.clone());
-    }
-    return response;
-  } catch (error) {
-    const cached = await cache.match(request);
-    if (cached) {
-      return cached;
-    }
-    throw error;
-  }
-}
-
-async function staleWhileRevalidate(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  const networkPromise = fetch(request)
-    .then(async (response) => {
-      if (request.method === "GET" && response.ok) {
-        await cache.put(request, response.clone());
-      }
-      return response;
-    })
-    .catch(() => undefined);
-
-  if (cached) {
-    return cached;
-  }
-  const networkResponse = await networkPromise;
-  return networkResponse || Response.error();
-}
-
 self.addEventListener("fetch", (event) => {
-  const { request } = event;
+  const request = event.request;
   const url = new URL(request.url);
-
-  if (request.method !== "GET" || url.origin !== self.location.origin) {
+  if (
+    request.method !== "GET" ||
+    url.origin !== self.location.origin ||
+    request.headers.has("range")
+  )
     return;
-  }
-
-  if (request.headers.has("range")) {
+  // Account-specific API state belongs in user-scoped IndexedDB, never a URL-only HTTP cache.
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/offline-packs/") ||
+    url.pathname === "/healthz" ||
+    url.pathname === "/readyz"
+  )
     return;
-  }
-
-  if (url.pathname.startsWith("/offline-packs/")) {
-    return;
-  }
-
   if (
     url.pathname.startsWith("/assets/") ||
-    url.pathname === "/manifest.webmanifest" ||
-    url.pathname === "/logo.svg" ||
-    url.pathname === "/favicon.svg" ||
-    url.pathname === "/apple-touch-icon.svg" ||
-    url.pathname === "/asset-manifest.json" ||
-    url.pathname === "/api-docs.html" ||
-    url.pathname === "/openapi.yaml" ||
-    url.pathname === "/swagger-ui/swagger-ui.css" ||
-    url.pathname === "/swagger-ui/swagger-ui-bundle.js"
+    (url.pathname !== "/" && APP_ASSETS.includes(url.pathname))
   ) {
-    event.respondWith(cacheFirst(request, APP_CACHE));
-    return;
-  }
-
-  if (
-    url.pathname.startsWith("/api/v1/session/bootstrap") ||
-    url.pathname.startsWith("/api/v1/sync/bootstrap") ||
-    url.pathname.startsWith("/api/v1/offline/manifest") ||
-    url.pathname.startsWith("/api/v1/me")
+    event.respondWith(shellAsset(request));
+  } else if (
+    request.mode === "navigate" &&
+    (/^\/(?:tech|about|activity|regions|profile)?\/?$/.test(url.pathname) ||
+      url.pathname.startsWith("/place/"))
   ) {
-    event.respondWith(networkFirst(request, DATA_CACHE));
-    return;
-  }
-
-  if (url.pathname.startsWith("/api/v1/")) {
-    event.respondWith(staleWhileRevalidate(request, DATA_CACHE));
-    return;
-  }
-
-  if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(async () => {
+      (async () => {
+        // Serve the shell and its assets from the same release, even on a slow/flaky connection.
         const cache = await caches.open(APP_CACHE);
-        return (await cache.match("/")) || Response.error();
-      }),
+        return (await cache.match("/")) || fetch(request);
+      })(),
     );
   }
 });

@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,7 +25,8 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	cfg, err := config.Load()
 	if err != nil {
 		panic(err)
@@ -47,6 +51,9 @@ func main() {
 	defer pool.Close()
 
 	var mailerImpl mail.Mailer = &mail.MemoryMailer{}
+	if cfg.AppEnv == "production" {
+		mailerImpl = mail.UnavailableMailer{}
+	}
 	if strings.TrimSpace(cfg.SMTPHost) != "" && strings.TrimSpace(cfg.SMTPFrom) != "" {
 		mailerImpl = mail.SMTPMailer{
 			Host:     cfg.SMTPHost,
@@ -94,10 +101,22 @@ func main() {
 		IdleTimeout:       120 * time.Second,
 	}
 	logger.Info("server starting", "listen_addr", cfg.ListenAddr)
-	if err := server.ListenAndServe(); err != nil {
+	shutdownDone := make(chan struct{})
+	go func() {
+		defer close(shutdownDone)
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			logger.Error("graceful shutdown failed")
+			_ = server.Close()
+		}
+	}()
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error("server stopped", "error", err)
 		os.Exit(1)
 	}
+	<-shutdownDone
 }
 
 func migrate(databaseURL string) error {

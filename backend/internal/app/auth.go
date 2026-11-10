@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	stdmail "net/mail"
 	"strings"
@@ -23,8 +24,14 @@ func (a *App) BootstrapSession(ctx context.Context, sessionToken, userAgent, ip 
 		if err == nil {
 			return a.meResponse(record), sessionToken, nil
 		}
+		var apiErr *apperr.Error
+		if !errors.As(err, &apiErr) || apiErr.Status != 401 {
+			return models.MeResponse{}, "", err
+		}
 	}
-
+	if !a.limiter.Allow("bootstrap:"+ip, 30, 15*time.Minute) {
+		return models.MeResponse{}, "", apperr.RateLimited("too many new sessions")
+	}
 	tx, err := a.db.Begin(ctx)
 	if err != nil {
 		return models.MeResponse{}, "", apperr.Internal(err)
@@ -115,12 +122,12 @@ func (a *App) ConfirmBindEmail(ctx context.Context, sessionToken, token, userAge
 	defer tx.Rollback(ctx)
 
 	var (
-		linkID      string
-		linkUserID  pgtype.Text
-		email       string
-		purpose     string
-		expiresAt   time.Time
-		usedAt      *time.Time
+		linkID     string
+		linkUserID pgtype.Text
+		email      string
+		purpose    string
+		expiresAt  time.Time
+		usedAt     *time.Time
 	)
 	if err := tx.QueryRow(ctx, `
 		SELECT email_magic_link_id::text, user_id::text, email, purpose, expires_at, used_at
@@ -309,12 +316,12 @@ func (a *App) ConfirmLogin(ctx context.Context, token, userAgent, ip string) (mo
 	defer tx.Rollback(ctx)
 
 	var (
-		linkID     string
-		userID     pgtype.Text
-		purpose    string
-		expiresAt  time.Time
-		usedAt     *time.Time
-		record     sessionRecord
+		linkID    string
+		userID    pgtype.Text
+		purpose   string
+		expiresAt time.Time
+		usedAt    *time.Time
+		record    sessionRecord
 	)
 	if err := tx.QueryRow(ctx, `
 		SELECT email_magic_link_id::text, user_id::text, purpose, expires_at, used_at

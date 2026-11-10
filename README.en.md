@@ -38,7 +38,7 @@ Captured locally with headless Google Chrome against the built app.
 ## Stack
 
 - Frontend: React, TypeScript, Vite, Tailwind CSS, MapLibre GL JS, Dexie, Playwright, Vitest
-- Backend: Go 1.25.8, chi, pgx, goose-compatible SQL migrations
+- Backend: Go 1.26.10, chi, pgx, goose-compatible SQL migrations
 - Data: PostgreSQL, PostGIS, PMTiles
 - Deploy: `nginx`, `systemd`, Docker Compose for local infrastructure
 

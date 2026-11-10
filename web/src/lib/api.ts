@@ -16,6 +16,8 @@ import type {
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     credentials: "include",
+    cache: "no-store",
+    signal: init?.signal ?? AbortSignal.timeout(15000),
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),

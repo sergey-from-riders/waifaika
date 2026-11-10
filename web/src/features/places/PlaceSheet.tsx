@@ -16,6 +16,7 @@ import { cn, formatDate, formatDistance, normalizeDegrees } from "@/lib/utils";
 type PlaceSheetProps = {
   place: DecoratedPlace;
   canEdit: boolean;
+  isSyncing?: boolean;
   originLabel: string;
   onEdit: () => void;
   onVote: (placeId: string, vote: VoteType) => void;
@@ -69,6 +70,7 @@ export function PlaceSheet(props: PlaceSheetProps) {
 
       <div className="grid grid-cols-2 gap-3">
         <VoteButton
+          disabled={props.isSyncing}
           tone="positive"
           active={worksActive}
           icon={<CheckCircledIcon />}
@@ -77,6 +79,7 @@ export function PlaceSheet(props: PlaceSheetProps) {
           onClick={() => props.onVote(props.place.place_id, VoteTypeEnum.Works)}
         />
         <VoteButton
+          disabled={props.isSyncing}
           tone="negative"
           active={notWorksActive}
           icon={<CrossCircledIcon />}
@@ -115,16 +118,18 @@ function VoteButton(props: {
   count: number;
   icon: ReactNode;
   active: boolean;
+  disabled?: boolean;
   tone: "positive" | "negative";
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      disabled={props.disabled}
       onClick={props.onClick}
       aria-pressed={props.active}
       className={cn(
-        "rounded-[1.35rem] border px-4 py-4 text-left transition-transform duration-300 ease-out active:scale-[0.98]",
+        "rounded-[1.35rem] border px-4 py-4 text-left transition-transform duration-300 ease-out active:scale-[0.98] disabled:opacity-60 disabled:cursor-wait",
         props.active
           ? props.tone === "positive"
             ? "border-emerald-400 bg-emerald-500/12 text-emerald-400"

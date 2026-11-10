@@ -8,16 +8,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/url"
 	"os"
 	"path"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"wifiyka/backend/internal/apperr"
 	"wifiyka/backend/internal/auth"
@@ -26,10 +28,17 @@ import (
 	"wifiyka/backend/internal/models"
 )
 
+type database interface {
+	Begin(context.Context) (pgx.Tx, error)
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
 type App struct {
 	cfg     config.Config
 	logger  *slog.Logger
-	db      *pgxpool.Pool
+	db      database
 	mailer  mail.Mailer
 	limiter *rateLimiter
 }
@@ -57,7 +66,7 @@ type userEmailRecord struct {
 	UpdatedAt   time.Time
 }
 
-func New(cfg config.Config, logger *slog.Logger, db *pgxpool.Pool, mailer mail.Mailer) *App {
+func New(cfg config.Config, logger *slog.Logger, db database, mailer mail.Mailer) *App {
 	return &App{
 		cfg:     cfg,
 		logger:  logger,
@@ -72,6 +81,17 @@ func (l *rateLimiter) Allow(key string, limit int, window time.Duration) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	// Bound memory even when clients rotate addresses or anonymous accounts.
+	if len(l.buckets) >= 10000 {
+		for k, bucket := range l.buckets {
+			if len(bucket) == 0 || now.Sub(bucket[len(bucket)-1]) >= 24*time.Hour {
+				delete(l.buckets, k)
+			}
+		}
+		if _, exists := l.buckets[key]; !exists && len(l.buckets) >= 10000 {
+			return false
+		}
+	}
 	hits := l.buckets[key][:0]
 	for _, ts := range l.buckets[key] {
 		if now.Sub(ts) < window {
@@ -134,6 +154,9 @@ func nullableString(value string) *string {
 }
 
 func validatePlaceInput(input models.PlaceInput) error {
+	if utf8.RuneCountInString(input.PlaceName) > 200 || utf8.RuneCountInString(input.WifiName) > 200 || (input.Description != nil && utf8.RuneCountInString(*input.Description) > 4000) || (input.PromoText != nil && utf8.RuneCountInString(*input.PromoText) > 1000) {
+		return apperr.Validation("place text is too long", nil)
+	}
 	if !contains([]string{"cafe", "library", "coworking", "park", "other"}, input.VenueType) {
 		return apperr.Validation("unsupported venue_type", map[string]any{"field": "venue_type"})
 	}
@@ -146,7 +169,7 @@ func validatePlaceInput(input models.PlaceInput) error {
 	if strings.TrimSpace(input.WifiName) == "" {
 		return apperr.Validation("wifi_name is required", map[string]any{"field": "wifi_name"})
 	}
-	if input.Lat < -90 || input.Lat > 90 || input.Lng < -180 || input.Lng > 180 {
+	if math.IsNaN(input.Lat) || math.IsNaN(input.Lng) || math.IsInf(input.Lat, 0) || math.IsInf(input.Lng, 0) || input.Lat < -90 || input.Lat > 90 || input.Lng < -180 || input.Lng > 180 {
 		return apperr.Validation("coordinates are invalid", map[string]any{"field": "lat/lng"})
 	}
 	return nil
@@ -412,7 +435,7 @@ func (a *App) listMyVotes(ctx context.Context, userID string) ([]models.PlaceVot
 		}
 		votes = append(votes, vote)
 	}
-	return votes, nil
+	return votes, rows.Err()
 }
 
 func (a *App) listMyPlaces(ctx context.Context, userID string) ([]models.Place, error) {
@@ -452,7 +475,7 @@ func (a *App) listMyPlaces(ctx context.Context, userID string) ([]models.Place, 
 		}
 		places = append(places, place)
 	}
-	return places, nil
+	return places, rows.Err()
 }
 
 func (a *App) ensureOfflinePacksDir() error {
@@ -495,4 +518,9 @@ func As(err error, target any) bool {
 
 func errorsAs(err error, target any) bool {
 	return fmt.Sprintf("%T", err) != "" && errors.As(err, target)
+}
+
+func (a *App) Ready(ctx context.Context) error {
+	var value int
+	return a.db.QueryRow(ctx, "SELECT 1").Scan(&value)
 }

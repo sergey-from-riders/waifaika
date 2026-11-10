@@ -118,6 +118,7 @@ export function AboutPage(props: AboutPageProps) {
       <div className="rounded-[1.75rem] border border-[var(--panel-border)] bg-[var(--panel-solid)] p-5">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--app-muted)]">Сервис</p>
         <h2 className="mt-2 text-[1.9rem] font-bold leading-none">О Вайфайке</h2>
+        <a href="/tech" className="mt-4 inline-flex font-semibold underline">Геоприложение для вашей территории →</a>
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="text-base text-[var(--app-muted)]">
             Вайфайка помогает быстро найти живой Wi-Fi рядом и поделиться рабочей точкой ссылкой.

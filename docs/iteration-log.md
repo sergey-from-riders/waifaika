@@ -221,3 +221,23 @@
 ### Risks
 - Community post templates универсальные и рассчитаны на быстрый старт; перед публикацией в конкретное сообщество лучше слегка адаптировать тон и длину под площадку.
 - Основной `README.md` теперь русскоязычный; для англоязычной аудитории нужно вести трафик на `README.en.md` или закрепить language switch в описании репозитория.
+
+## 2026-11-10 — Geo PWA reliability and architecture
+
+- done: `/tech` for geographic use cases, complete versioned offline shell and map
+  worker, SHA-256 package verification, atomic local outbox and cross-tab writes,
+  account partitioning, atomic/idempotent database delivery, request fingerprint
+  migration, request bounds/CSRF boundary, database readiness, graceful stop,
+  SMTP deadlines and updated dependency/toolchain versions. Architecture,
+  deployment guide and OpenAPI/public copy updated.
+- validation: 31 frontend tests pass; production build passes; 16 Playwright tests
+  pass across iPhone/Pixel light/dark Chromium profiles, including real service
+  worker, cached 17 MB PMTiles, offline reload, voting and reconnect. Backend
+  `go test -race` passes with real disposable PostGIS. `npm audit` and
+  `govulncheck` report no known vulnerabilities. No hardware Safari/compass test
+  or real email delivery is implied by these results.
+- next: verify live release/health and complete repository delivery; new territory
+  implementations are separate product scope, including indoor positioning.
+- risks: browser storage eviction; first visit/address search/email need internet;
+  single-node runtime; legacy timestamp feed requires bootstrap. Full details and
+  changed files are in `docs/release-2026-11-10.md`.

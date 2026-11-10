@@ -1,11 +1,14 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -38,16 +41,26 @@ func New(service Service, staticRoot http.Handler, offlinePacks http.Handler, le
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
+	// Forwarded addresses are accepted only from the local reverse proxy.
+	r.Use(trustedProxyIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(rt.securityHeaders)
+	r.Use(requestBoundary)
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, r, http.StatusOK, map[string]any{"status": "ok"})
 	})
 	r.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if ready, ok := rt.service.(interface{ Ready(context.Context) error }); ok {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+			if ready.Ready(ctx) != nil {
+				writeJSON(w, r, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+				return
+			}
+		}
 		writeJSON(w, r, http.StatusOK, map[string]any{"status": "ready"})
 	})
 	r.Get("/api-docs", func(w http.ResponseWriter, r *http.Request) {
@@ -408,6 +421,7 @@ func (rt *Router) setSessionCookie(w http.ResponseWriter, token string) {
 
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Request-ID", middleware.GetReqID(r.Context()))
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
@@ -457,6 +471,9 @@ func parseNearbyQuery(r *http.Request) (models.NearbyQuery, error) {
 	if radius <= 0 {
 		radius = 100
 	}
+	if lat < -90 || lat > 90 || lng < -180 || lng > 180 || radius > 500 {
+		return models.NearbyQuery{}, apperr.Validation("coordinates or radius out of range", nil)
+	}
 	return models.NearbyQuery{Lat: lat, Lng: lng, RadiusKM: radius}, nil
 }
 
@@ -466,8 +483,8 @@ func parseFloatQuery(r *http.Request, key string) (float64, error) {
 		return 0, apperr.Validation(key+" is required", nil)
 	}
 	value, err := strconv.ParseFloat(raw, 64)
-	if err != nil {
-		return 0, apperr.Validation(key+" must be numeric", nil)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, apperr.Validation(key+" must be finite numeric", nil)
 	}
 	return value, nil
 }
@@ -489,6 +506,37 @@ func (rt *Router) securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		if rt.secure {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func trustedProxyIP(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := net.ParseIP(clientIP(r))
+		if ip != nil && ip.IsLoopback() {
+			if forwarded := net.ParseIP(r.Header.Get("X-Real-IP")); forwarded != nil {
+				r.RemoteAddr = forwarded.String()
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+func requestBoundary(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+			if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+				writeError(w, r, apperr.Forbidden("cross-origin mutation denied"))
+				return
+			}
+			if origin := r.Header.Get("Origin"); origin != "" {
+				u, err := url.Parse(origin)
+				if err != nil || u.Host != r.Host || (u.Scheme != "http" && u.Scheme != "https") {
+					writeError(w, r, apperr.Forbidden("cross-origin mutation denied"))
+					return
+				}
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		}
 		next.ServeHTTP(w, r)
 	})

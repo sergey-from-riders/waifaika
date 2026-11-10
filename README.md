@@ -6,6 +6,8 @@ Wifiyka это mobile-first карта и PWA для поиска и обмен�
 
 Этот проект можно использовать не только как карту Wi-Fi, но и как основу для других location-heavy приложений: городских гидов, полевых сервисов, офлайн-карт, каталогов мест, review-карт и любых продуктов, где важны карта, синхронизация и устойчивый mobile UX.
 
+[Геоплатформа и сценарии применения](https://wifi.eval.su/tech) · [Архитектура](docs/architecture.md) · [Изменения и проверка](docs/release-2026-11-10.md)
+
 ## Скриншоты
 
 Снято локально через headless Google Chrome на собранной версии приложения.
@@ -38,7 +40,7 @@ Wifiyka это mobile-first карта и PWA для поиска и обмен�
 ## Стек
 
 - Frontend: React, TypeScript, Vite, Tailwind CSS, MapLibre GL JS, Dexie, Playwright, Vitest
-- Backend: Go 1.25.8, chi, pgx, goose-compatible SQL migrations
+- Backend: Go 1.26.10, chi, pgx, goose-compatible SQL migrations
 - Data: PostgreSQL, PostGIS, PMTiles
 - Deploy: `nginx`, `systemd`, Docker Compose для локальной infra
 

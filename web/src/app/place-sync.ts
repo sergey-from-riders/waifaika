@@ -1,6 +1,9 @@
 import { SOCHI_CENTER, type LocationState } from "@/lib/geolocation";
 import type { LocalPlace, LocalVote, Place, PlaceVote } from "@/lib/types";
-import { SyncStatus as SyncStatusEnum, VoteType as VoteTypeEnum } from "@/lib/types";
+import {
+  SyncStatus as SyncStatusEnum,
+  VoteType as VoteTypeEnum,
+} from "@/lib/types";
 
 export function toLocalPlace(place: Place): LocalPlace {
   return {
@@ -53,24 +56,29 @@ export function mergePlaces(current: LocalPlace[], incoming: LocalPlace[]) {
     if (existing && existing.sync_status !== SyncStatusEnum.Synced) {
       continue;
     }
-    map.set(key, item);
+    map.set(key, existing ? { ...item, local_id: existing.local_id } : item);
   }
-  return Array.from(map.values()).sort((a, b) => b.updated_at_client.localeCompare(a.updated_at_client));
+  return Array.from(map.values()).sort((a, b) =>
+    b.updated_at_client.localeCompare(a.updated_at_client),
+  );
 }
 
 export function mergeVotes(current: LocalVote[], incoming: LocalVote[]) {
   const map = new Map<string, LocalVote>();
   for (const item of current) {
-    map.set(item.place_id, item);
+    map.set(`${item.user_id}:${item.place_id}`, item);
   }
   for (const item of incoming) {
-    const existing = map.get(item.place_id);
+    const key = `${item.user_id}:${item.place_id}`;
+    const existing = map.get(key);
     if (existing && existing.sync_status !== SyncStatusEnum.Synced) {
       continue;
     }
-    map.set(item.place_id, item);
+    map.set(key, existing ? { ...item, local_id: existing.local_id } : item);
   }
-  return Array.from(map.values()).sort((a, b) => b.updated_at_client.localeCompare(a.updated_at_client));
+  return Array.from(map.values()).sort((a, b) =>
+    b.updated_at_client.localeCompare(a.updated_at_client),
+  );
 }
 
 export function locationToCenter(state: LocationState) {
@@ -80,7 +88,10 @@ export function locationToCenter(state: LocationState) {
   return SOCHI_CENTER;
 }
 
-export function applyLocalVoteOverlay(place: Place, localVote?: LocalVote | null): Place {
+export function applyLocalVoteOverlay(
+  place: Place,
+  localVote?: LocalVote | null,
+): Place {
   if (!localVote) {
     return place;
   }
@@ -92,7 +103,8 @@ export function applyLocalVoteOverlay(place: Place, localVote?: LocalVote | null
     place.works_count + voteDelta(baselineVote, activeVote, VoteTypeEnum.Works),
   );
   const notWorksCount = clampCount(
-    place.not_works_count + voteDelta(baselineVote, activeVote, VoteTypeEnum.NotWorks),
+    place.not_works_count +
+      voteDelta(baselineVote, activeVote, VoteTypeEnum.NotWorks),
   );
 
   return {
@@ -102,8 +114,14 @@ export function applyLocalVoteOverlay(place: Place, localVote?: LocalVote | null
   };
 }
 
-function voteDelta(baselineVote: LocalVote["server_vote"], activeVote: LocalVote["server_vote"], targetVote: VoteTypeEnum) {
-  return Number(activeVote === targetVote) - Number(baselineVote === targetVote);
+function voteDelta(
+  baselineVote: LocalVote["server_vote"],
+  activeVote: LocalVote["server_vote"],
+  targetVote: VoteTypeEnum,
+) {
+  return (
+    Number(activeVote === targetVote) - Number(baselineVote === targetVote)
+  );
 }
 
 function clampCount(value: number) {

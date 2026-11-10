@@ -1,8 +1,12 @@
 openapi: 3.1.0
 info:
   title: Wifiyka API
-  version: 0.1.0
-  description: REST API for the Wifiyka Wi-Fi map MVP.
+  version: 0.2.0
+  description: >-
+    Same-origin API for an offline geographic PWA. Writes use an HttpOnly session
+    cookie and reject cross-origin browser requests. JSON request limit is 1 MiB.
+    Account data is never stored in a shared HTTP cache. The supported client
+    synchronization protocol is durable outbox delivery followed by bootstrap.
 servers:
   - url: https://wifi.eval.su
 paths:
@@ -18,6 +22,8 @@ paths:
       responses:
         "200":
           description: Ready
+        "503":
+          description: Database is unavailable
   /api/v1/session/bootstrap:
     post:
       summary: Bootstrap anonymous session
@@ -206,24 +212,85 @@ paths:
   /api/v1/sync/outbox:
     post:
       summary: Apply offline operations
+      description: >-
+        Each operation commits its mutation and receipt atomically. Replay the
+        same UUID and request after a lost response; do not generate a new UUID.
+        A UUID reused with different input returns 409. The batch is sequential,
+        not one transaction: earlier operations may have committed if a later
+        one returns 429 or 5xx. Retry the unchanged batch safely. Failed/conflict
+        receipts are final; resolve the error before creating a new operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [operations]
+              properties:
+                operations:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    $ref: "#/components/schemas/SyncOperation"
       responses:
         "200":
           description: Sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results, server_time]
+                properties:
+                  server_time: {type: string, format: date-time}
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [client_operation_id, status]
+                      properties:
+                        client_operation_id: {type: string, format: uuid}
+                        status: {type: string, enum: [applied, failed, conflict]}
+                        entity_id: {type: string, format: uuid}
+                        error_code: {type: string}
+                        error_message: {type: string}
+        "400": {description: Invalid operation or request}
+        "401": {description: Session required}
+        "409": {description: Reused operation UUID or legacy unfinished receipt}
+        "429": {description: Rate limit; retry unchanged operation later}
   /api/v1/sync/bootstrap:
     get:
       summary: Bootstrap nearby and my data for offline sync
+      description: >-
+        Returns me, nearby_places, my_places, my_votes, offline_packs and server_time.
+        Replace the current user's synchronized local records; preserve unsent
+        drafts. Personal lists are complete snapshots. Nearby places are limited
+        to 250. Parameters lat/lng are finite geographic coordinates; radius_km
+        is required and at most 500; non-positive values select the default 100.
       responses:
         "200":
           description: Sync bootstrap payload
   /api/v1/sync/changes:
     get:
-      summary: Incremental changes since timestamp
+      summary: Legacy advisory changes
+      deprecated: true
+      description: >-
+        Bounded to 1000 places, including deleted status. Requires since in RFC3339.
+        Always returns requires_bootstrap=true: timestamps do not represent commit
+        order and vote deletions have no tombstone in this response. Do not use
+        server_time as a reliable replication cursor. Use sync/bootstrap for
+        reconciliation; current PWA does not use this legacy endpoint.
       responses:
         "200":
           description: Changed entities
   /api/v1/offline/manifest:
     get:
       summary: Offline pack manifest
+      description: >-
+        Packs contain pack_id, region_name, url, size_bytes, version_hash (SHA-256)
+        and updated_at. Currently returns the deployment's available packages;
+        geographic filtering is not implemented. Validate length and SHA-256
+        before replacing a downloaded package. PMTiles format version is 3.
       responses:
         "200":
           description: Pack manifest
@@ -237,6 +304,22 @@ components:
         type: string
         format: uuid
   schemas:
+    SyncOperation:
+      type: object
+      required: [client_operation_id, entity_type, operation_type, payload]
+      properties:
+        client_operation_id: {type: string, format: uuid}
+        entity_type: {type: string, enum: [place, place_vote]}
+        entity_id:
+          type: string
+          format: uuid
+          description: Place ID required for updates, deletes and both vote operations.
+        operation_type:
+          type: string
+          enum: [place_create, place_update, place_delete, vote_upsert, vote_delete]
+        payload:
+          type: object
+          description: PlaceInput, PlacePatch, VoteInput or DeleteInput according to operation_type.
     MeResponse:
       type: object
       properties:

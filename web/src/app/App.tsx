@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 
 import {
   applyLocalVoteOverlay,
@@ -16,9 +23,15 @@ import { ToastBanner } from "@/components/ToastBanner";
 import { db } from "@/db/app-db";
 import { buildLocalPlace, buildLocalVote, makeOutboxRecord } from "@/db/outbox";
 import { MapPage } from "@/features/map/MapPage";
-import { type MapViewport, viewportRequestKey, viewportRadiusKm } from "@/features/map/viewport";
+import {
+  type MapViewport,
+  viewportRequestKey,
+  viewportRadiusKm,
+} from "@/features/map/viewport";
 import { PlaceForm } from "@/features/places/PlaceForm";
 import { PlaceSheet } from "@/features/places/PlaceSheet";
+import { validatePack } from "@/lib/pack-integrity";
+import { withWriteLock } from "@/db/write-lock";
 import {
   readLocationPermissionState,
   requestDeviceLocation,
@@ -31,12 +44,16 @@ import { api } from "@/lib/api";
 import { reverseGeocode, searchGeocode } from "@/lib/nominatim";
 import {
   clearOfflineCaches,
-  DATA_CACHE_NAME,
   formatStorageUsage,
   MANUAL_PACK_CACHE_NAME,
   readOfflineUsageBytes,
 } from "@/lib/offline-cache";
-import { boundsContainLocation, enrichRegionsWithBounds, pickRegionForCenter, readPackBoundsFromFile } from "@/lib/offline-packs";
+import {
+  boundsContainLocation,
+  enrichRegionsWithBounds,
+  pickRegionForCenter,
+  readPackBoundsFromFile,
+} from "@/lib/offline-packs";
 import {
   mergeRegionRecords,
   requestPersistentStorage,
@@ -46,7 +63,11 @@ import {
   upsertRegionRecord,
 } from "@/lib/offline";
 import { requestOrientationAccess, startCompassWatch } from "@/lib/orientation";
-import { getInstallState, registerServiceWorker, subscribeInstallPrompt } from "@/lib/pwa";
+import {
+  getInstallState,
+  registerServiceWorker,
+  subscribeInstallPrompt,
+} from "@/lib/pwa";
 import type {
   LocalPlace,
   LocalVote,
@@ -65,7 +86,12 @@ import {
   SyncStatus as SyncStatusEnum,
   VoteType as VoteTypeEnum,
 } from "@/lib/types";
-import { bearingDegrees, cn, distanceBetweenMeters, normalizeDegrees } from "@/lib/utils";
+import {
+  bearingDegrees,
+  cn,
+  distanceBetweenMeters,
+  normalizeDegrees,
+} from "@/lib/utils";
 import { ActivityPage, AboutPage, PlainPage } from "@/pages/AppPages";
 import { LegalDocumentPage } from "@/pages/LegalDocumentPage";
 
@@ -88,6 +114,10 @@ function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const syncInProgress = useRef(false);
+  const initializing = useRef(false);
+  const latestSync = useRef<() => Promise<void>>(async () => {});
+  latestSync.current = () => syncNow();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [nearbyPlaces, setNearbyPlaces] = useState<Place[]>([]);
   const [myPlaces, setMyPlaces] = useState<LocalPlace[]>([]);
@@ -95,10 +125,14 @@ function AppShell() {
   const [regions, setRegions] = useState<RegionRecord[]>([]);
   const [mapPack, setMapPack] = useState<MapPackSource | null>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
-  const [locationState, setLocationState] = useState<LocationState>({ status: "idle" });
+  const [locationState, setLocationState] = useState<LocationState>({
+    status: "idle",
+  });
   const [center, setCenter] = useState(SOCHI_CENTER);
   const [loading, setLoading] = useState(true);
-  const [syncState, setSyncState] = useState<SyncStatus | "idle" | "syncing">("idle");
+  const [syncState, setSyncState] = useState<SyncStatus | "idle" | "syncing">(
+    "idle",
+  );
   const [toast, setToast] = useState<Toast | null>(null);
   const [editingLocalId, setEditingLocalId] = useState<string | null>(null);
   const [bindEmail, setBindEmail] = useState("");
@@ -108,24 +142,33 @@ function AppShell() {
   const [installTick, setInstallTick] = useState(0);
   const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
   const [offlineUsageBytes, setOfflineUsageBytes] = useState(0);
-  const [offlineCacheState, setOfflineCacheState] = useState<OfflineCacheIndicatorState>("idle");
+  const [offlineCacheState, setOfflineCacheState] =
+    useState<OfflineCacheIndicatorState>("idle");
   const [clearingOffline, setClearingOffline] = useState(false);
   const [addressSearchBusy, setAddressSearchBusy] = useState(false);
-  const [addressSearchError, setAddressSearchError] = useState<string | null>(null);
-  const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
-    if (typeof window === "undefined") {
-      return "system";
-    }
-    const saved = window.localStorage.getItem("wifiyka-theme-preference");
-    return saved === "light" || saved === "dark" ? saved : "system";
-  });
+  const [addressSearchError, setAddressSearchError] = useState<string | null>(
+    null,
+  );
+  const [themePreference, setThemePreference] = useState<ThemePreference>(
+    () => {
+      if (typeof window === "undefined") {
+        return "system";
+      }
+      const saved = window.localStorage.getItem("wifiyka-theme-preference");
+      return saved === "light" || saved === "dark" ? saved : "system";
+    },
+  );
   const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(prefers-color-scheme: dark)").matches : false,
+    typeof window !== "undefined"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches
+      : false,
   );
   const [addFlow, setAddFlow] = useState<AddFlow>(null);
   const [pickerMapMoving, setPickerMapMoving] = useState(false);
   const [nearestHintDismissed, setNearestHintDismissed] = useState(() =>
-    typeof window !== "undefined" ? window.sessionStorage.getItem(NEARBY_HINT_DISMISSED_KEY) === "1" : false,
+    typeof window !== "undefined"
+      ? window.sessionStorage.getItem(NEARBY_HINT_DISMISSED_KEY) === "1"
+      : false,
   );
   const installState = useMemo(() => getInstallState(), [installTick]);
   const locationWatchRef = useRef<number | null>(null);
@@ -139,7 +182,12 @@ function AppShell() {
   const offlineCacheOpsRef = useRef(0);
   const sharedPlaceFetchRef = useRef<string | null>(null);
   const viewportCoverageRef = useRef<string | null>(null);
-  const theme = themePreference === "system" ? (systemPrefersDark ? "dark" : "light") : themePreference;
+  const theme =
+    themePreference === "system"
+      ? systemPrefersDark
+        ? "dark"
+        : "light"
+      : themePreference;
   const routePlaceId = useMemo(() => {
     if (!location.pathname.startsWith("/place/")) {
       return null;
@@ -147,12 +195,20 @@ function AppShell() {
     const raw = location.pathname.slice("/place/".length).split("/")[0];
     return raw ? decodeURIComponent(raw) : null;
   }, [location.pathname]);
-  const sharedPlaceId = useMemo(() => routePlaceId || new URLSearchParams(location.search).get("place"), [location.search, routePlaceId]);
-  const isMapRoute = location.pathname === "/" || location.pathname.startsWith("/place/");
+  const sharedPlaceId = useMemo(
+    () => routePlaceId || new URLSearchParams(location.search).get("place"),
+    [location.search, routePlaceId],
+  );
+  const isMapRoute =
+    location.pathname === "/" || location.pathname.startsWith("/place/");
 
   const currentLocation =
     locationState.status === "granted"
-      ? { lat: locationState.lat, lng: locationState.lng, accuracy: locationState.accuracy }
+      ? {
+          lat: locationState.lat,
+          lng: locationState.lng,
+          accuracy: locationState.accuracy,
+        }
       : null;
   const localVoteLookup = useMemo(() => {
     return new Map(myVotes.map((item) => [item.place_id, item]));
@@ -163,7 +219,11 @@ function AppShell() {
     targetCenter = center,
     preferredPackId?: string | null,
   ) {
-    const primary = pickRegionForCenter(nextRegions, targetCenter, preferredPackId);
+    const primary = pickRegionForCenter(
+      nextRegions,
+      targetCenter,
+      preferredPackId,
+    );
     if (!primary) {
       setMapPack(null);
       return;
@@ -186,16 +246,29 @@ function AppShell() {
     });
   }
 
-  async function restoreNearbyFromCache(nextRegions: RegionRecord[], targetCenter = center) {
+  async function restoreNearbyFromCache(
+    nextRegions: RegionRecord[],
+    targetCenter = center,
+  ) {
     const containingPackIds = nextRegions
       .filter((item) => boundsContainLocation(item.bounds, targetCenter))
       .map((item) => item.pack_id);
-    const fallbackPackId = pickRegionForCenter(nextRegions, targetCenter)?.pack_id;
+    const fallbackPackId = pickRegionForCenter(
+      nextRegions,
+      targetCenter,
+    )?.pack_id;
     const packIds =
-      containingPackIds.length > 0 ? containingPackIds : fallbackPackId ? [fallbackPackId] : nextRegions.map((item) => item.pack_id);
+      containingPackIds.length > 0
+        ? containingPackIds
+        : fallbackPackId
+          ? [fallbackPackId]
+          : nextRegions.map((item) => item.pack_id);
 
     if (packIds.length > 0) {
-      const regionSnapshots = await db.region_places.where("pack_id").anyOf(packIds).toArray();
+      const regionSnapshots = await db.region_places
+        .where("pack_id")
+        .anyOf(packIds)
+        .toArray();
       const restored = restorePlacesFromRegionRecords(regionSnapshots);
       if (restored.length > 0) {
         return restored;
@@ -221,9 +294,13 @@ function AppShell() {
     }
   }
 
-  async function applyOfflinePacks(packs: OfflinePack[], targetCenter = center): Promise<RegionRecord[]> {
+  async function applyOfflinePacks(
+    packs: OfflinePack[],
+    targetCenter = center,
+  ): Promise<RegionRecord[]> {
     const current = await db.regions.toArray();
-    const merged = packs.length > 0 ? mergeRegionRecords(current, packs) : current;
+    const merged =
+      packs.length > 0 ? mergeRegionRecords(current, packs) : current;
     const enriched = await enrichRegionsWithBounds(merged);
     setRegions(enriched);
     await db.regions.bulkPut(enriched);
@@ -231,27 +308,49 @@ function AppShell() {
     return enriched;
   }
 
-  async function cacheMissingPacks(packs: OfflinePack[], nextRegions: RegionRecord[], targetCenter = center) {
-    const activeRegion = pickRegionForCenter(nextRegions, targetCenter, packs[0]?.pack_id);
+  async function cacheMissingPacks(
+    packs: OfflinePack[],
+    nextRegions: RegionRecord[],
+    targetCenter = center,
+  ) {
+    const activeRegion = pickRegionForCenter(
+      nextRegions,
+      targetCenter,
+      packs[0]?.pack_id,
+    );
     let allCached = true;
     for (const pack of packs) {
-      const cached = nextRegions.find((item) => item.pack_id === pack.pack_id && item.cache_status === "cached");
+      const cached = nextRegions.find(
+        (item) =>
+          item.pack_id === pack.pack_id && item.cache_status === "cached",
+      );
       if (!cached) {
-        const success = await downloadPack(pack, activeRegion?.pack_id === pack.pack_id);
+        const success = await downloadPack(
+          pack,
+          activeRegion?.pack_id === pack.pack_id,
+        );
         allCached = allCached && success;
       }
     }
     return allCached;
   }
 
-  async function applyCoveragePayload(packs: OfflinePack[], places: Place[], targetCenter = center) {
+  async function applyCoveragePayload(
+    packs: OfflinePack[],
+    places: Place[],
+    targetCenter = center,
+  ) {
     const finishCaching = beginOfflineCaching();
     try {
       setNearbyPlaces(places);
       await db.app_state.put({ key: "nearby_places", value: places });
       const nextRegions = await applyOfflinePacks(packs, targetCenter);
       await persistNearbySnapshot(packs, places);
-      const packsCached = await cacheMissingPacks(packs, nextRegions, targetCenter);
+      const packsCached = await cacheMissingPacks(
+        packs,
+        nextRegions,
+        targetCenter,
+      );
       void requestPersistentStorage();
       await refreshOfflineUsage();
       finishCaching(packsCached ? "cached" : "error");
@@ -263,7 +362,9 @@ function AppShell() {
   }
 
   async function restoreViewportFromCache(targetCenter = center) {
-    const cachedRegions = await enrichRegionsWithBounds(await db.regions.toArray());
+    const cachedRegions = await enrichRegionsWithBounds(
+      await db.regions.toArray(),
+    );
     setRegions(cachedRegions);
     await db.regions.bulkPut(cachedRegions);
     await resolveMapPack(cachedRegions, targetCenter);
@@ -276,19 +377,6 @@ function AppShell() {
   async function persistCenter(nextCenter: { lat: number; lng: number }) {
     setCenter(nextCenter);
     await db.app_state.put({ key: "last_center", value: nextCenter });
-  }
-
-  async function seedCachedMe(nextMe: MeResponse) {
-    if (!("caches" in window)) {
-      return;
-    }
-    const cache = await caches.open(DATA_CACHE_NAME);
-    await cache.put(
-      "/api/v1/me",
-      new Response(JSON.stringify(nextMe), {
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-      }),
-    );
   }
 
   async function refreshOfflineUsage() {
@@ -307,16 +395,21 @@ function AppShell() {
     }
     setOfflineCacheState("caching");
 
-    return (nextState: Exclude<OfflineCacheIndicatorState, "caching"> = "cached") => {
+    return (
+      nextState: Exclude<OfflineCacheIndicatorState, "caching"> = "cached",
+    ) => {
       offlineCacheOpsRef.current = Math.max(0, offlineCacheOpsRef.current - 1);
       if (offlineCacheOpsRef.current > 0) {
         return;
       }
       setOfflineCacheState(nextState);
-      offlineIndicatorTimeoutRef.current = window.setTimeout(() => {
-        setOfflineCacheState("idle");
-        offlineIndicatorTimeoutRef.current = null;
-      }, nextState === "error" ? 2600 : 1600);
+      offlineIndicatorTimeoutRef.current = window.setTimeout(
+        () => {
+          setOfflineCacheState("idle");
+          offlineIndicatorTimeoutRef.current = null;
+        },
+        nextState === "error" ? 2600 : 1600,
+      );
     };
   }
 
@@ -345,10 +438,16 @@ function AppShell() {
       }));
     const map = new Map<string, Place>();
     for (const place of nearbyPlaces) {
-      map.set(place.place_id, applyLocalVoteOverlay(place, localVoteLookup.get(place.place_id)));
+      map.set(
+        place.place_id,
+        applyLocalVoteOverlay(place, localVoteLookup.get(place.place_id)),
+      );
     }
     for (const place of localShadowPlaces) {
-      map.set(place.place_id, applyLocalVoteOverlay(place, localVoteLookup.get(place.place_id)));
+      map.set(
+        place.place_id,
+        applyLocalVoteOverlay(place, localVoteLookup.get(place.place_id)),
+      );
     }
     return Array.from(map.values());
   }, [localVoteLookup, myPlaces, nearbyPlaces]);
@@ -358,7 +457,9 @@ function AppShell() {
   }, [visiblePlaces]);
 
   const selectedPlace = useMemo<DecoratedPlace | null>(() => {
-    const place = visiblePlaces.find((item) => item.place_id === selectedPlaceId);
+    const place = visiblePlaces.find(
+      (item) => item.place_id === selectedPlaceId,
+    );
     if (!place) {
       return null;
     }
@@ -371,16 +472,30 @@ function AppShell() {
     return {
       ...place,
       distance_meters: distanceBetweenMeters(origin, place),
-      direction_degrees: deviceHeading == null ? bearing : normalizeDegrees(bearing - deviceHeading),
+      direction_degrees:
+        deviceHeading == null
+          ? bearing
+          : normalizeDegrees(bearing - deviceHeading),
       local_vote: localVote && !localVote.is_deleted ? localVote : null,
     };
-  }, [center, deviceHeading, localVoteLookup, locationState, selectedPlaceId, visiblePlaces]);
+  }, [
+    center,
+    deviceHeading,
+    localVoteLookup,
+    locationState,
+    selectedPlaceId,
+    visiblePlaces,
+  ]);
 
   const editablePlaceLocalId = useMemo(() => {
     if (!selectedPlace) {
       return null;
     }
-    return myPlaces.find((item) => (item.place_id ?? item.local_id) === selectedPlace.place_id)?.local_id ?? null;
+    return (
+      myPlaces.find(
+        (item) => (item.place_id ?? item.local_id) === selectedPlace.place_id,
+      )?.local_id ?? null
+    );
   }, [myPlaces, selectedPlace]);
 
   const nearestHintPlace = useMemo<DecoratedPlace | null>(() => {
@@ -395,7 +510,10 @@ function AppShell() {
       if (!closest) {
         return place;
       }
-      return distanceBetweenMeters(origin, place) < distanceBetweenMeters(origin, closest) ? place : closest;
+      return distanceBetweenMeters(origin, place) <
+        distanceBetweenMeters(origin, closest)
+        ? place
+        : closest;
     }, null);
     if (!nearest) {
       return null;
@@ -405,7 +523,10 @@ function AppShell() {
     return {
       ...nearest,
       distance_meters: distanceBetweenMeters(origin, nearest),
-      direction_degrees: deviceHeading == null ? bearing : normalizeDegrees(bearing - deviceHeading),
+      direction_degrees:
+        deviceHeading == null
+          ? bearing
+          : normalizeDegrees(bearing - deviceHeading),
       local_vote: localVote && !localVote.is_deleted ? localVote : null,
     };
   }, [center, deviceHeading, localVoteLookup, locationState, visiblePlaces]);
@@ -420,7 +541,8 @@ function AppShell() {
       return;
     }
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = (event: MediaQueryListEvent) => setSystemPrefersDark(event.matches);
+    const onChange = (event: MediaQueryListEvent) =>
+      setSystemPrefersDark(event.matches);
     setSystemPrefersDark(media.matches);
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
@@ -428,15 +550,17 @@ function AppShell() {
 
   useEffect(() => {
     registerServiceWorker();
-    const unsubscribeInstall = subscribeInstallPrompt(() => setInstallTick((value) => value + 1));
+    const unsubscribeInstall = subscribeInstallPrompt(() =>
+      setInstallTick((value) => value + 1),
+    );
     void initialize();
 
     const onOnline = () => {
-      void syncNow();
+      void latestSync.current();
       void refreshOfflineUsage();
     };
     const onFocus = () => {
-      void syncNow();
+      void latestSync.current();
       void refreshOfflineUsage();
     };
 
@@ -459,13 +583,17 @@ function AppShell() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.DeviceOrientationEvent === "undefined") {
+    if (
+      typeof window === "undefined" ||
+      typeof window.DeviceOrientationEvent === "undefined"
+    ) {
       return;
     }
 
-    const OrientationCtor = window.DeviceOrientationEvent as (typeof DeviceOrientationEvent & {
-      requestPermission?: () => Promise<"granted" | "denied">;
-    });
+    const OrientationCtor =
+      window.DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+        requestPermission?: () => Promise<"granted" | "denied">;
+      };
 
     if (typeof OrientationCtor.requestPermission !== "function") {
       void ensureCompassTracking();
@@ -514,13 +642,18 @@ function AppShell() {
           .getPlace(sharedPlaceId)
           .then((place) => {
             setNearbyPlaces((current) => {
-              const filtered = current.filter((item) => item.place_id !== place.place_id);
+              const filtered = current.filter(
+                (item) => item.place_id !== place.place_id,
+              );
               return [place, ...filtered];
             });
             setSelectedPlaceId(place.place_id);
           })
           .catch(() => {
-            setToast({ tone: "error", message: "Точку из ссылки не удалось загрузить" });
+            setToast({
+              tone: "error",
+              message: "Точку из ссылки не удалось загрузить",
+            });
           });
       }
       return;
@@ -549,7 +682,11 @@ function AppShell() {
       geocodeAbortRef.current?.abort();
       const controller = new AbortController();
       geocodeAbortRef.current = controller;
-      void reverseGeocode(addFlow.draft.lat, addFlow.draft.lng, controller.signal)
+      void reverseGeocode(
+        addFlow.draft.lat,
+        addFlow.draft.lng,
+        controller.signal,
+      )
         .then((resolved) => {
           setAddFlow((current) =>
             current?.step === "pick" || current?.step === "form"
@@ -588,6 +725,8 @@ function AppShell() {
   }, [addFlow?.draft.lat, addFlow?.draft.lng, addFlow?.step]);
 
   async function initialize() {
+    if (initializing.current) return;
+    initializing.current = true;
     setLoading(true);
     try {
       const cached = await Promise.all([
@@ -603,13 +742,18 @@ function AppShell() {
           ? (cached[5].value as { lat: number; lng: number })
           : SOCHI_CENTER;
       const cachedRegions = await enrichRegionsWithBounds(cached[2]);
-      setMyPlaces(cached[0]);
-      setMyVotes(cached[1]);
+      const cachedUser = (cached[4]?.value as MeResponse | undefined)?.user
+        .user_id;
+      setMyPlaces(cached[0].filter((item) => item.user_id === cachedUser));
+      setMyVotes(cached[1].filter((item) => item.user_id === cachedUser));
       setRegions(cachedRegions);
       await db.regions.bulkPut(cachedRegions);
       await resolveMapPack(cachedRegions, bootCenter);
       await refreshOfflineUsage();
-      const cachedNearby = await restoreNearbyFromCache(cachedRegions, bootCenter);
+      const cachedNearby = await restoreNearbyFromCache(
+        cachedRegions,
+        bootCenter,
+      );
       if (cachedNearby.length > 0) {
         setNearbyPlaces(cachedNearby);
       } else if (Array.isArray(cached[3]?.value)) {
@@ -634,7 +778,9 @@ function AppShell() {
             try {
               bootMe = await api.getMe();
             } catch (error) {
-              const apiError = error as Error & { payload?: { error?: { code?: string } } };
+              const apiError = error as Error & {
+                payload?: { error?: { code?: string } };
+              };
               if (apiError.payload?.error?.code === "unauthorized") {
                 bootMe = await api.bootstrapSession();
               } else {
@@ -659,7 +805,6 @@ function AppShell() {
           if (bootMe) {
             setMe(bootMe);
             await db.app_state.put({ key: "me", value: bootMe });
-            await seedCachedMe(bootMe);
           }
           canRefreshBootstrap = true;
         } catch (error) {
@@ -684,7 +829,8 @@ function AppShell() {
       } else if (permission === "denied") {
         setLocationState({
           status: "denied",
-          reason: "Геопозиция заблокирована. Включите доступ к локации в браузере",
+          reason:
+            "Геопозиция заблокирована. Включите доступ к локации в браузере",
           ...bootCenter,
         });
       } else {
@@ -703,28 +849,79 @@ function AppShell() {
       }
     } catch (error) {
       console.error(error);
-      setToast({ tone: "error", message: "Показываю кэш, сервер сейчас недоступен" });
+      setToast({
+        tone: "error",
+        message: "Показываю кэш, сервер сейчас недоступен",
+      });
     } finally {
+      initializing.current = false;
       setLoading(false);
     }
   }
 
+  useEffect(() => {
+    if (me && !loading) void latestSync.current();
+  }, [me?.user.user_id, loading]);
+
   async function refreshBootstrap(nextCenter = center) {
     try {
-      const payload = await api.syncBootstrap(nextCenter.lat, nextCenter.lng, MAP_RADIUS_KM);
+      const payload = await api.syncBootstrap(
+        nextCenter.lat,
+        nextCenter.lng,
+        MAP_RADIUS_KM,
+      );
       setMe(payload.me);
       const syncedPlaces = payload.my_places.map(toLocalPlace);
       const syncedVotes = payload.my_votes.map(toLocalVoteEntry);
-      setMyPlaces((current) => mergePlaces(current, syncedPlaces));
-      setMyVotes((current) => mergeVotes(current, syncedVotes));
-      await db.my_places.bulkPut(mergePlaces(await db.my_places.toArray(), syncedPlaces));
-      await db.my_votes.bulkPut(mergeVotes(await db.my_votes.toArray(), syncedVotes));
+      await db.transaction("rw", db.my_places, db.my_votes, async () => {
+        const currentPlaces = await db.my_places
+          .where("user_id")
+          .equals(payload.me.user.user_id)
+          .toArray();
+        const currentVotes = await db.my_votes
+          .where("user_id")
+          .equals(payload.me.user.user_id)
+          .toArray();
+        const mergedPlaces = mergePlaces(
+          currentPlaces.filter(
+            (p) =>
+              p.sync_status !== SyncStatusEnum.Synced ||
+              syncedPlaces.some((s) => s.place_id === p.place_id),
+          ),
+          syncedPlaces,
+        );
+        const mergedVotes = mergeVotes(
+          currentVotes.filter(
+            (p) =>
+              p.sync_status !== SyncStatusEnum.Synced ||
+              syncedVotes.some((s) => s.place_id === p.place_id),
+          ),
+          syncedVotes,
+        );
+        await db.my_places
+          .where("user_id")
+          .equals(payload.me.user.user_id)
+          .delete();
+        await db.my_votes
+          .where("user_id")
+          .equals(payload.me.user.user_id)
+          .delete();
+        await db.my_places.bulkPut(mergedPlaces);
+        await db.my_votes.bulkPut(mergedVotes);
+        setMyPlaces(mergedPlaces);
+        setMyVotes(mergedVotes);
+      });
       await db.app_state.put({ key: "me", value: payload.me });
-      await applyCoveragePayload(payload.offline_packs, payload.nearby_places, nextCenter);
+      await applyCoveragePayload(
+        payload.offline_packs,
+        payload.nearby_places,
+        nextCenter,
+      );
       viewportCoverageRef.current = null;
       setSyncState(SyncStatusEnum.Synced);
     } catch (error) {
       console.error(error);
+      throw error;
     }
   }
 
@@ -741,8 +938,16 @@ function AppShell() {
     }
 
     try {
-      const payload = await api.syncBootstrap(viewport.center.lat, viewport.center.lng, viewportRadiusKm(viewport));
-      await applyCoveragePayload(payload.offline_packs, payload.nearby_places, viewport.center);
+      const payload = await api.syncBootstrap(
+        viewport.center.lat,
+        viewport.center.lng,
+        viewportRadiusKm(viewport),
+      );
+      await applyCoveragePayload(
+        payload.offline_packs,
+        payload.nearby_places,
+        viewport.center,
+      );
       viewportCoverageRef.current = requestKey;
     } catch (error) {
       console.error(error);
@@ -758,11 +963,12 @@ function AppShell() {
         throw new Error(`pack download failed: ${response.status}`);
       }
       const blob = await response.clone().blob();
+      await validatePack(blob, pack);
       const source = packBlobToSource(pack, blob);
-      const previous = await db.regions.get(pack.pack_id);
       const bounds =
-        previous?.bounds ??
-        (source.kind === "file" ? await readPackBoundsFromFile(source.file).catch(() => null) : null);
+        source.kind === "file"
+          ? await readPackBoundsFromFile(source.file)
+          : null;
       if ("caches" in window) {
         const cache = await caches.open(MANUAL_PACK_CACHE_NAME);
         await cache.put(pack.url, response.clone());
@@ -776,7 +982,11 @@ function AppShell() {
       await db.regions.put(region);
       setRegions((current) => upsertRegionRecord(current, region));
       setMapPack((current) => {
-        if (!activate && current && !current.key.includes(`:${pack.pack_id}:${pack.version_hash}`)) {
+        if (
+          !activate &&
+          current &&
+          !current.key.includes(`:${pack.pack_id}:${pack.version_hash}`)
+        ) {
           return current;
         }
         return source;
@@ -799,7 +1009,10 @@ function AppShell() {
   async function enableLocation() {
     if (locationState.status === "granted") {
       await persistCenter({ lat: locationState.lat, lng: locationState.lng });
-      await refreshBootstrap({ lat: locationState.lat, lng: locationState.lng });
+      await refreshBootstrap({
+        lat: locationState.lat,
+        lng: locationState.lng,
+      });
       return;
     }
 
@@ -816,9 +1029,15 @@ function AppShell() {
       return;
     }
     if (geo.status === "prompt") {
-      setToast({ tone: "info", message: "Браузер ждёт системный ответ по геопозиции" });
+      setToast({
+        tone: "info",
+        message: "Браузер ждёт системный ответ по геопозиции",
+      });
     } else if (geo.status === "denied") {
-      setToast({ tone: "info", message: "Доступ к геопозиции заблокирован в браузере" });
+      setToast({
+        tone: "info",
+        message: "Доступ к геопозиции заблокирован в браузере",
+      });
     }
   }
 
@@ -860,14 +1079,20 @@ function AppShell() {
             }
           : current,
       );
-      setToast({ tone: "success", message: "Точку переместил к найденному адресу" });
+      setToast({
+        tone: "success",
+        message: "Точку переместил к найденному адресу",
+      });
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         return;
       }
       console.error(error);
       setAddressSearchError("Поиск адреса временно не ответил");
-      setToast({ tone: "error", message: "Не удалось найти адрес через Nominatim" });
+      setToast({
+        tone: "error",
+        message: "Не удалось найти адрес через Nominatim",
+      });
     } finally {
       if (geocodeSearchAbortRef.current === controller) {
         geocodeSearchAbortRef.current = null;
@@ -893,7 +1118,9 @@ function AppShell() {
         }
 
         compassStopRef.current?.();
-        compassStopRef.current = startCompassWatch((heading) => setDeviceHeading(heading));
+        compassStopRef.current = startCompassWatch((heading) =>
+          setDeviceHeading(heading),
+        );
         compassActiveRef.current = true;
         return true;
       })
@@ -918,13 +1145,39 @@ function AppShell() {
   }
 
   async function syncNow(message?: string) {
+    return withWriteLock(() => syncLocked(message));
+  }
+
+  async function syncLocked(message?: string) {
     if (!navigator.onLine || !me) {
       setSyncState(SyncStatusEnum.Pending);
       return;
     }
+    if (syncInProgress.current) return;
+    syncInProgress.current = true;
     setSyncState("syncing");
     try {
-      const outbox = await db.outbox.filter((item) => item.status === "pending" || item.status === "failed").sortBy("created_at");
+      const currentMe = await api.getMe();
+      if (currentMe.user.user_id !== me.user.user_id) {
+        await initialize();
+        return;
+      }
+      const owned = new Set([
+        ...(
+          await db.my_places.where("user_id").equals(me.user.user_id).toArray()
+        ).map((p) => p.local_id),
+        ...(
+          await db.my_votes.where("user_id").equals(me.user.user_id).toArray()
+        ).map((p) => p.local_id),
+      ]);
+      const outbox = (
+        await db.outbox
+          .filter(
+            (item) =>
+              owned.has(item.entity_local_id) && item.status === "pending",
+          )
+          .sortBy("created_at")
+      ).slice(0, 100);
       if (outbox.length > 0) {
         const response = await api.syncOutbox(
           outbox.map((item) => ({
@@ -937,14 +1190,18 @@ function AppShell() {
         );
 
         for (const result of response.results) {
-          const outboxRecord = outbox.find((item) => item.client_operation_id === result.client_operation_id);
+          const outboxRecord = outbox.find(
+            (item) => item.client_operation_id === result.client_operation_id,
+          );
           if (!outboxRecord) {
             continue;
           }
           if (result.status === "applied") {
             await db.outbox.delete(outboxRecord.client_operation_id);
             if (outboxRecord.entity_type === "place") {
-              const local = await db.my_places.get(outboxRecord.entity_local_id);
+              const local = await db.my_places.get(
+                outboxRecord.entity_local_id,
+              );
               if (local) {
                 local.sync_status = SyncStatusEnum.Synced;
                 local.sync_error = null;
@@ -954,7 +1211,9 @@ function AppShell() {
               }
             }
             if (outboxRecord.entity_type === "place_vote") {
-              const localVote = await db.my_votes.get(outboxRecord.entity_local_id);
+              const localVote = await db.my_votes.get(
+                outboxRecord.entity_local_id,
+              );
               if (localVote) {
                 if (outboxRecord.operation_type === "vote_delete") {
                   await db.my_votes.delete(outboxRecord.entity_local_id);
@@ -964,7 +1223,8 @@ function AppShell() {
                   localVote.is_deleted = false;
                   localVote.deleted_at_client = null;
                   localVote.server_vote = localVote.vote;
-                  localVote.place_vote_id = result.entity_id ?? localVote.place_vote_id;
+                  localVote.place_vote_id =
+                    result.entity_id ?? localVote.place_vote_id;
                   localVote.last_synced_at = new Date().toISOString();
                   await db.my_votes.put(localVote);
                 }
@@ -978,17 +1238,27 @@ function AppShell() {
               retry_count: outboxRecord.retry_count + 1,
             });
             if (outboxRecord.entity_type === "place") {
-              const local = await db.my_places.get(outboxRecord.entity_local_id);
+              const local = await db.my_places.get(
+                outboxRecord.entity_local_id,
+              );
               if (local) {
-                local.sync_status = result.status === "conflict" ? SyncStatusEnum.Conflict : SyncStatusEnum.Failed;
+                local.sync_status =
+                  result.status === "conflict"
+                    ? SyncStatusEnum.Conflict
+                    : SyncStatusEnum.Failed;
                 local.sync_error = result.error_message ?? null;
                 await db.my_places.put(local);
               }
             }
             if (outboxRecord.entity_type === "place_vote") {
-              const localVote = await db.my_votes.get(outboxRecord.entity_local_id);
+              const localVote = await db.my_votes.get(
+                outboxRecord.entity_local_id,
+              );
               if (localVote) {
-                localVote.sync_status = result.status === "conflict" ? SyncStatusEnum.Conflict : SyncStatusEnum.Failed;
+                localVote.sync_status =
+                  result.status === "conflict"
+                    ? SyncStatusEnum.Conflict
+                    : SyncStatusEnum.Failed;
                 localVote.sync_error = result.error_message ?? null;
                 await db.my_votes.put(localVote);
               }
@@ -998,24 +1268,59 @@ function AppShell() {
       }
 
       await refreshBootstrap(center);
-      setMyPlaces(await db.my_places.toArray());
-      setMyVotes(await db.my_votes.toArray());
-      setSyncState(SyncStatusEnum.Synced);
+      const ownPlaces = await db.my_places
+        .where("user_id")
+        .equals(me.user.user_id)
+        .toArray();
+      const ownVotes = await db.my_votes
+        .where("user_id")
+        .equals(me.user.user_id)
+        .toArray();
+      setMyPlaces(ownPlaces);
+      setMyVotes(ownVotes);
+      const remaining = await db.outbox
+        .filter((item) => owned.has(item.entity_local_id))
+        .toArray();
+      setSyncState(
+        remaining.some((i) => i.status === "conflict")
+          ? SyncStatusEnum.Conflict
+          : remaining.some((i) => i.status === "failed")
+            ? SyncStatusEnum.Failed
+            : remaining.length
+              ? SyncStatusEnum.Pending
+              : SyncStatusEnum.Synced,
+      );
       if (message) {
         setToast({ tone: "success", message });
       }
     } catch (error) {
       console.error(error);
       setSyncState(SyncStatusEnum.Failed);
-      setToast({ tone: "error", message: "Синхронизация не удалась, изменения не потерялись" });
+      setToast({
+        tone: "error",
+        message: "Синхронизация не удалась, изменения не потерялись",
+      });
+    } finally {
+      syncInProgress.current = false;
     }
   }
 
   async function submitPlace(input: PlaceInput) {
+    return withWriteLock(() => submitPlaceLocked(input));
+  }
+
+  async function submitPlaceLocked(input: PlaceInput) {
+    if (syncInProgress.current) {
+      setToast({ tone: "info", message: "Дождитесь завершения синхронизации" });
+      return;
+    }
     if (!me) {
       return;
     }
-    const editing = editingLocalId ? myPlaces.find((item) => item.local_id === editingLocalId) : null;
+    const editing = editingLocalId
+      ? await db.my_places.get(editingLocalId)
+      : null;
+    if (editing && editing.user_id !== me.user.user_id) return;
     if (editing && editing.place_id) {
       const patch: PlacePatch = {
         venue_type: input.venue_type,
@@ -1036,34 +1341,76 @@ function AppShell() {
         sync_error: null,
         updated_at_client: new Date().toISOString(),
       };
-      await db.my_places.put(next);
-      await db.outbox.put(makeOutboxRecord("place", editing.local_id, "place_update", patch, editing.place_id));
-      setMyPlaces((current) => current.map((item) => (item.local_id === editing.local_id ? next : item)));
+      await db.transaction("rw", db.my_places, db.outbox, async () => {
+        await db.my_places.put(next);
+        const stale = await db.outbox
+          .filter((item) => item.entity_local_id === editing.local_id)
+          .toArray();
+        await db.outbox.bulkDelete(
+          stale.map((item) => item.client_operation_id),
+        );
+        await db.outbox.put(
+          makeOutboxRecord(
+            "place",
+            editing.local_id,
+            "place_update",
+            patch,
+            editing.place_id,
+          ),
+        );
+      });
+      setMyPlaces((current) =>
+        current.map((item) =>
+          item.local_id === editing.local_id ? next : item,
+        ),
+      );
     } else {
       const local = buildLocalPlace(me.user.user_id, input);
-      await db.my_places.put(local);
-      await db.outbox.put(makeOutboxRecord("place", local.local_id, "place_create", input));
+      await db.transaction("rw", db.my_places, db.outbox, async () => {
+        await db.my_places.put(local);
+        await db.outbox.put(
+          makeOutboxRecord("place", local.local_id, "place_create", input),
+        );
+      });
       setMyPlaces((current) => [local, ...current]);
     }
     setAddFlow(null);
     setEditingLocalId(null);
     setToast({ tone: "success", message: "Точка сохранена" });
     if (navigator.onLine) {
-      await syncNow();
+      await syncLocked();
     }
   }
 
   async function voteForPlace(placeId: string, vote: VoteType) {
+    return withWriteLock(() => voteLocked(placeId, vote));
+  }
+
+  async function voteLocked(placeId: string, vote: VoteType) {
+    if (syncInProgress.current) return;
     if (!me) {
       return;
     }
-    const existing = myVotes.find((item) => item.place_id === placeId);
+    const existing = await db.my_votes
+      .where("user_id")
+      .equals(me.user.user_id)
+      .filter((item) => item.place_id === placeId)
+      .first();
     const timestamp = new Date().toISOString();
     const baselineVote = existing?.server_vote ?? null;
 
-    if (existing && !existing.is_deleted && existing.vote === vote && baselineVote == null) {
-      await removeVoteLocally(existing.local_id);
-      setMyVotes((current) => current.filter((item) => item.place_id !== placeId));
+    if (
+      existing &&
+      !existing.is_deleted &&
+      existing.vote === vote &&
+      baselineVote == null
+    ) {
+      await db.transaction("rw", db.my_votes, db.outbox, () =>
+        removeVoteLocally(existing.local_id),
+      );
+      setMyVotes((current) =>
+        current.filter((item) => item.place_id !== placeId),
+      );
       setToast({ tone: "info", message: "Голос снят" });
       return;
     }
@@ -1090,26 +1437,42 @@ function AppShell() {
             }
           : buildLocalVote(me.user.user_id, placeId, vote);
 
-    await db.my_votes.put(next);
-    await replaceVoteOutbox(
+    await db.transaction("rw", db.my_votes, db.outbox, async () => {
+      await db.my_votes.put(next);
+      await replaceVoteOutbox(
+        next,
+        next.is_deleted
+          ? makeOutboxRecord(
+              "place_vote",
+              next.local_id,
+              "vote_delete",
+              { version: next.version },
+              placeId,
+            )
+          : makeOutboxRecord(
+              "place_vote",
+              next.local_id,
+              "vote_upsert",
+              {
+                vote: next.vote,
+                ...(baselineVote ? { version: next.version } : {}),
+              },
+              placeId,
+            ),
+      );
+    });
+    setMyVotes((current) => [
       next,
-      next.is_deleted
-        ? makeOutboxRecord("place_vote", next.local_id, "vote_delete", { version: next.version }, placeId)
-        : makeOutboxRecord(
-            "place_vote",
-            next.local_id,
-            "vote_upsert",
-            { vote: next.vote, ...(baselineVote ? { version: next.version } : {}) },
-            placeId,
-          ),
-    );
-    setMyVotes((current) => [next, ...current.filter((item) => item.place_id !== placeId)]);
+      ...current.filter((item) => item.place_id !== placeId),
+    ]);
     if (navigator.onLine) {
-      await syncNow();
+      await syncLocked();
     } else {
       setToast({
         tone: "info",
-        message: next.is_deleted ? "Снятие голоса сохранено и уйдёт при появлении сети" : "Голос сохранён и уйдёт при появлении сети",
+        message: next.is_deleted
+          ? "Снятие голоса сохранено и уйдёт при появлении сети"
+          : "Голос сохранён и уйдёт при появлении сети",
       });
     }
   }
@@ -1117,7 +1480,9 @@ function AppShell() {
   async function startBind() {
     try {
       await api.startBindEmail(bindEmail, bindConsent);
-      setBindStatus("Мы отправили ссылку на почту. Откройте письмо на этом устройстве.");
+      setBindStatus(
+        "Мы отправили ссылку на почту. Откройте письмо на этом устройстве.",
+      );
       setToast({ tone: "success", message: "Письмо ушло" });
     } catch (error) {
       console.error(error);
@@ -1132,7 +1497,10 @@ function AppShell() {
       setToast({ tone: "success", message: "Ссылка для входа отправлена" });
     } catch (error) {
       console.error(error);
-      setToast({ tone: "error", message: "Не удалось отправить письмо для входа" });
+      setToast({
+        tone: "error",
+        message: "Не удалось отправить письмо для входа",
+      });
     }
   }
 
@@ -1196,7 +1564,10 @@ function AppShell() {
   }
 
   async function sharePlace(place: Place) {
-    const url = new URL(`/place/${encodeURIComponent(place.place_id)}`, window.location.origin);
+    const url = new URL(
+      `/place/${encodeURIComponent(place.place_id)}`,
+      window.location.origin,
+    );
     const browserNavigator = window.navigator as Navigator & {
       clipboard?: Clipboard;
       share?: (data?: ShareData) => Promise<void>;
@@ -1269,7 +1640,9 @@ function AppShell() {
 
   function confirmPickedLocation() {
     setAddressSearchError(null);
-    setAddFlow((current) => (current?.step === "pick" ? { ...current, step: "form" } : current));
+    setAddFlow((current) =>
+      current?.step === "pick" ? { ...current, step: "form" } : current,
+    );
   }
 
   function cancelAddFlow() {
@@ -1333,7 +1706,8 @@ function AppShell() {
   const accountVotes = useMemo(() => {
     return myVotes.map((vote) => ({
       ...vote,
-      place_name: visiblePlaceLookup.get(vote.place_id)?.place_name ?? "Точка Wi-Fi",
+      place_name:
+        visiblePlaceLookup.get(vote.place_id)?.place_name ?? "Точка Wi-Fi",
     }));
   }, [myVotes, visiblePlaceLookup]);
 
@@ -1378,8 +1752,19 @@ function AppShell() {
   );
 
   return (
-    <div className={cn("min-h-screen bg-[var(--app-bg)] text-[var(--app-fg)]", isMapRoute ? "overflow-hidden" : "pb-32")}>
-      <main className={cn(isMapRoute ? "h-[100dvh]" : "mx-auto flex min-h-screen max-w-[34rem] flex-col px-4 pb-28 pt-4")}>
+    <div
+      className={cn(
+        "min-h-screen bg-[var(--app-bg)] text-[var(--app-fg)]",
+        isMapRoute ? "overflow-hidden" : "pb-32",
+      )}
+    >
+      <main
+        className={cn(
+          isMapRoute
+            ? "h-[100dvh]"
+            : "mx-auto flex min-h-screen max-w-[34rem] flex-col px-4 pb-28 pt-4",
+        )}
+      >
         <Routes>
           <Route path="/" element={mapPageElement} />
           <Route path="/place/:placeId" element={mapPageElement} />
@@ -1409,7 +1794,18 @@ function AppShell() {
                   setLoginEmail={setLoginEmail}
                   onStartLogin={startLoginFlow}
                   onLogout={async () => {
+                    if (syncInProgress.current) {
+                      setToast({
+                        tone: "info",
+                        message: "Дождитесь завершения синхронизации",
+                      });
+                      return;
+                    }
                     await api.logout();
+                    await db.app_state.delete("me");
+                    setMe(null);
+                    setMyPlaces([]);
+                    setMyVotes([]);
                     setToast({ tone: "success", message: "Сессия завершена" });
                     void initialize();
                   }}
@@ -1420,13 +1816,19 @@ function AppShell() {
           />
           <Route path="/me" element={<Navigate to="/activity" replace />} />
           <Route path="/profile" element={<Navigate to="/about" replace />} />
-          <Route path="/my-data" element={<Navigate to="/activity" replace />} />
+          <Route
+            path="/my-data"
+            element={<Navigate to="/activity" replace />}
+          />
           <Route path="/offline" element={<Navigate to="/" replace />} />
           <Route
             path="/privacy"
             element={
               <PlainPage title="Политика конфиденциальности" backTo="/about">
-                <LegalDocumentPage documentPath="/legal/privacy.txt" expectedFile="deploy/legal/privacy.txt" />
+                <LegalDocumentPage
+                  documentPath="/legal/privacy.txt"
+                  expectedFile="deploy/legal/privacy.txt"
+                />
               </PlainPage>
             }
           />
@@ -1455,10 +1857,13 @@ function AppShell() {
       <BottomSheet open={Boolean(selectedPlace)} onClose={closePlaceSheet}>
         {selectedPlace ? (
           <PlaceSheet
+            isSyncing={syncState === "syncing"}
             place={selectedPlace}
             canEdit={Boolean(editablePlaceLocalId)}
             originLabel={currentLocation ? "от вас" : "от центра карты"}
-            onEdit={() => (editablePlaceLocalId ? startEdit(editablePlaceLocalId) : undefined)}
+            onEdit={() =>
+              editablePlaceLocalId ? startEdit(editablePlaceLocalId) : undefined
+            }
             onVote={voteForPlace}
             onShare={sharePlace}
             onCopyCoordinates={copyCoordinates}
@@ -1480,7 +1885,12 @@ function AppShell() {
         }
       >
         <PlaceForm
-          initial={editingLocalId ? myPlaces.find((item) => item.local_id === editingLocalId) ?? null : null}
+          initial={
+            editingLocalId
+              ? (myPlaces.find((item) => item.local_id === editingLocalId) ??
+                null)
+              : null
+          }
           draft={addFlow?.step === "form" ? addFlow.draft : null}
           onSubmit={submitPlace}
           onCancel={cancelAddFlow}
@@ -1495,9 +1905,16 @@ function AppShell() {
   );
 }
 
-async function replaceVoteOutbox(vote: LocalVote, nextRecord: ReturnType<typeof makeOutboxRecord>) {
+async function replaceVoteOutbox(
+  vote: LocalVote,
+  nextRecord: ReturnType<typeof makeOutboxRecord>,
+) {
   const stale = await db.outbox
-    .filter((item) => item.entity_type === "place_vote" && item.entity_local_id === vote.local_id)
+    .filter(
+      (item) =>
+        item.entity_type === "place_vote" &&
+        item.entity_local_id === vote.local_id,
+    )
     .toArray();
   if (stale.length > 0) {
     await db.outbox.bulkDelete(stale.map((item) => item.client_operation_id));
@@ -1508,20 +1925,30 @@ async function replaceVoteOutbox(vote: LocalVote, nextRecord: ReturnType<typeof 
 async function removeVoteLocally(localId: string) {
   await db.my_votes.delete(localId);
   const stale = await db.outbox
-    .filter((item) => item.entity_type === "place_vote" && item.entity_local_id === localId)
+    .filter(
+      (item) =>
+        item.entity_type === "place_vote" && item.entity_local_id === localId,
+    )
     .toArray();
   if (stale.length > 0) {
     await db.outbox.bulkDelete(stale.map((item) => item.client_operation_id));
   }
 }
 
-function packBlobToSource(pack: Pick<OfflinePack, "pack_id" | "region_name" | "version_hash">, blob: Blob): MapPackSource {
+function packBlobToSource(
+  pack: Pick<OfflinePack, "pack_id" | "region_name" | "version_hash">,
+  blob: Blob,
+): MapPackSource {
   return {
     kind: "file",
     key: `file:${pack.pack_id}:${pack.version_hash}`,
     label: pack.region_name,
-    file: new File([blob], `${pack.pack_id}-${pack.version_hash.slice(0, 8)}.pmtiles`, {
-      type: blob.type || "application/octet-stream",
-    }),
+    file: new File(
+      [blob],
+      `${pack.pack_id}-${pack.version_hash.slice(0, 8)}.pmtiles`,
+      {
+        type: blob.type || "application/octet-stream",
+      },
+    ),
   };
 }

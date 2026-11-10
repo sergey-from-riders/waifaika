@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -58,6 +59,9 @@ func (a *App) ListPlaces(ctx context.Context, sessionToken string, query models.
 		if _, err := fmt.Sscanf(query.BBox, "%f,%f,%f,%f", &minLng, &minLat, &maxLng, &maxLat); err != nil {
 			return nil, apperr.Validation("bbox must be minLng,minLat,maxLng,maxLat", nil)
 		}
+		if math.IsNaN(minLng) || math.IsNaN(minLat) || math.IsNaN(maxLng) || math.IsNaN(maxLat) || minLng < -180 || maxLng > 180 || minLat < -90 || maxLat > 90 || minLng > maxLng || minLat > maxLat {
+			return nil, apperr.Validation("invalid bbox bounds", nil)
+		}
 		args = append(args, minLng, minLat, maxLng, maxLat)
 		sqlBuilder.WriteString(fmt.Sprintf(" AND ST_Intersects(geom::geometry, ST_MakeEnvelope($%d, $%d, $%d, $%d, 4326))", len(args)-3, len(args)-2, len(args)-1, len(args)))
 	}
@@ -88,6 +92,9 @@ func (a *App) ListPlaces(ctx context.Context, sessionToken string, query models.
 			return nil, apperr.Internal(err)
 		}
 		places = append(places, place)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, apperr.Internal(err)
 	}
 	return places, nil
 }
@@ -134,6 +141,9 @@ func (a *App) NearbyPlaces(ctx context.Context, sessionToken string, query model
 			return nil, apperr.Internal(err)
 		}
 		places = append(places, place)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, apperr.Internal(err)
 	}
 	return places, nil
 }

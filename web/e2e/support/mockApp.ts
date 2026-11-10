@@ -1,4 +1,5 @@
 import type { Page, Route } from "@playwright/test";
+import type { OfflinePack } from "../../src/lib/types";
 
 type VoteType = "works" | "not_works";
 
@@ -33,6 +34,7 @@ type VoteRecord = {
 };
 
 type ServerState = {
+  packs?: OfflinePack[];
   me: {
     user: {
       user_id: string;
@@ -108,10 +110,14 @@ function createInitialState(): ServerState {
   };
 }
 
-export async function installAppMocks(page: Page) {
+export async function installAppMocks(
+  page: Page,
+  options: { serviceWorker?: boolean; packs?: OfflinePack[] } = {},
+) {
   const state = createInitialState();
+  state.packs = options.packs;
 
-  await page.addInitScript(() => {
+  await page.addInitScript((serviceWorker) => {
     const position = {
       coords: {
         latitude: 43.5855,
@@ -134,16 +140,19 @@ export async function installAppMocks(page: Page) {
       },
     });
 
-    Object.defineProperty(navigator, "serviceWorker", {
-      configurable: true,
-      value: undefined,
-    });
+    if (!serviceWorker)
+      Object.defineProperty(navigator, "serviceWorker", {
+        configurable: true,
+        value: undefined,
+      });
 
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: {
         writeText: async (text: string) => {
-          (window as unknown as { __e2e: { clipboard: string[] } }).__e2e.clipboard.push(text);
+          (
+            window as unknown as { __e2e: { clipboard: string[] } }
+          ).__e2e.clipboard.push(text);
         },
       },
     });
@@ -154,7 +163,9 @@ export async function installAppMocks(page: Page) {
     });
 
     window.confirm = (message: string) => {
-      (window as unknown as { __e2e: { confirms: string[] } }).__e2e.confirms.push(message);
+      (
+        window as unknown as { __e2e: { confirms: string[] } }
+      ).__e2e.confirms.push(message);
       return true;
     };
 
@@ -172,7 +183,8 @@ export async function installAppMocks(page: Page) {
     Object.defineProperty(navigator, "geolocation", {
       configurable: true,
       value: {
-        getCurrentPosition: (success: (value: typeof position) => void) => success(position),
+        getCurrentPosition: (success: (value: typeof position) => void) =>
+          success(position),
         watchPosition: (success: (value: typeof position) => void) => {
           success(position);
           return 1;
@@ -180,10 +192,14 @@ export async function installAppMocks(page: Page) {
         clearWatch: () => undefined,
       },
     });
-  });
+  }, options.serviceWorker ?? false);
 
-  await page.route("**/api/v1/session/bootstrap", async (route) => handleApiRoute(route, state));
-  await page.route("**/api/v1/**", async (route) => handleApiRoute(route, state));
+  await page.route("**/api/v1/session/bootstrap", async (route) =>
+    handleApiRoute(route, state),
+  );
+  await page.route("**/api/v1/**", async (route) =>
+    handleApiRoute(route, state),
+  );
 
   await page.route("https://nominatim.openstreetmap.org/**", async (route) => {
     const url = new URL(route.request().url());
@@ -227,11 +243,17 @@ export async function installAppMocks(page: Page) {
 }
 
 export async function readClipboardWrites(page: Page) {
-  return page.evaluate(() => (window as unknown as { __e2e: { clipboard: string[] } }).__e2e.clipboard);
+  return page.evaluate(
+    () =>
+      (window as unknown as { __e2e: { clipboard: string[] } }).__e2e.clipboard,
+  );
 }
 
 export async function readConfirmWrites(page: Page) {
-  return page.evaluate(() => (window as unknown as { __e2e: { confirms: string[] } }).__e2e.confirms);
+  return page.evaluate(
+    () =>
+      (window as unknown as { __e2e: { confirms: string[] } }).__e2e.confirms,
+  );
 }
 
 async function handleApiRoute(route: Route, state: ServerState) {
@@ -252,24 +274,33 @@ async function handleApiRoute(route: Route, state: ServerState) {
     await json(route, {
       me: state.me,
       nearby_places: state.places,
-      my_places: state.places.filter((place) => place.user_id === state.me.user.user_id),
+      my_places: state.places.filter(
+        (place) => place.user_id === state.me.user.user_id,
+      ),
       my_votes: state.votes,
-      offline_packs: [],
+      offline_packs: state.packs ?? [],
       server_time: nowIso(),
     });
     return;
   }
 
-  if (url.pathname === "/api/v1/offline/manifest" && request.method() === "GET") {
+  if (
+    url.pathname === "/api/v1/offline/manifest" &&
+    request.method() === "GET"
+  ) {
     await json(route, {
-      packs: [],
+      packs: state.packs ?? [],
       radius_km: Number(url.searchParams.get("radius_km") || 100),
       server_time: nowIso(),
     });
     return;
   }
 
-  if (url.pathname.startsWith("/api/v1/places/") && url.pathname.endsWith("/vote") && request.method() === "POST") {
+  if (
+    url.pathname.startsWith("/api/v1/places/") &&
+    url.pathname.endsWith("/vote") &&
+    request.method() === "POST"
+  ) {
     const placeId = url.pathname.split("/")[4];
     const payload = request.postDataJSON() as { vote: VoteType };
     const vote = upsertVote(state, placeId, payload.vote);
@@ -277,7 +308,11 @@ async function handleApiRoute(route: Route, state: ServerState) {
     return;
   }
 
-  if (url.pathname.startsWith("/api/v1/places/") && url.pathname.endsWith("/vote") && request.method() === "DELETE") {
+  if (
+    url.pathname.startsWith("/api/v1/places/") &&
+    url.pathname.endsWith("/vote") &&
+    request.method() === "DELETE"
+  ) {
     const placeId = url.pathname.split("/")[4];
     const removed = deleteVote(state, placeId);
     await json(route, {
@@ -288,14 +323,20 @@ async function handleApiRoute(route: Route, state: ServerState) {
     return;
   }
 
-  if (url.pathname.startsWith("/api/v1/places/") && request.method() === "GET") {
+  if (
+    url.pathname.startsWith("/api/v1/places/") &&
+    request.method() === "GET"
+  ) {
     const placeId = url.pathname.split("/")[4];
     const place = state.places.find((item) => item.place_id === placeId);
     if (!place) {
       await route.fulfill({
         status: 404,
         contentType: "application/json",
-        body: JSON.stringify({ error: { code: "not_found", message: "not found" }, request_id: "req-1" }),
+        body: JSON.stringify({
+          error: { code: "not_found", message: "not found" },
+          request_id: "req-1",
+        }),
       });
       return;
     }
@@ -313,7 +354,9 @@ async function handleApiRoute(route: Route, state: ServerState) {
         payload: Record<string, unknown>;
       }>;
     };
-    const results = payload.operations.map((operation) => applyOutboxOperation(state, operation));
+    const results = payload.operations.map((operation) =>
+      applyOutboxOperation(state, operation),
+    );
     await json(route, {
       results,
       server_time: nowIso(),
@@ -330,7 +373,10 @@ async function handleApiRoute(route: Route, state: ServerState) {
     status: 404,
     contentType: "application/json",
     body: JSON.stringify({
-      error: { code: "not_found", message: `${request.method()} ${url.pathname}` },
+      error: {
+        code: "not_found",
+        message: `${request.method()} ${url.pathname}`,
+      },
       request_id: "req-unhandled",
     }),
   });
@@ -348,7 +394,11 @@ function applyOutboxOperation(
 ) {
   if (operation.entity_type === "place_vote") {
     if (operation.operation_type === "vote_upsert") {
-      const vote = upsertVote(state, operation.entity_id || "", String(operation.payload.vote) as VoteType);
+      const vote = upsertVote(
+        state,
+        operation.entity_id || "",
+        String(operation.payload.vote) as VoteType,
+      );
       return {
         client_operation_id: operation.client_operation_id,
         status: "applied",
@@ -366,7 +416,10 @@ function applyOutboxOperation(
     }
   }
 
-  if (operation.entity_type === "place" && operation.operation_type === "place_create") {
+  if (
+    operation.entity_type === "place" &&
+    operation.operation_type === "place_create"
+  ) {
     const place = createPlace(state, operation.payload);
     return {
       client_operation_id: operation.client_operation_id,
@@ -390,7 +443,8 @@ function createPlace(state: ServerState, payload: Record<string, unknown>) {
     venue_type: String(payload.venue_type || "cafe"),
     place_name: String(payload.place_name || "Новая точка"),
     wifi_name: String(payload.wifi_name || "wifi"),
-    description: payload.description == null ? null : String(payload.description),
+    description:
+      payload.description == null ? null : String(payload.description),
     promo_text: payload.promo_text == null ? null : String(payload.promo_text),
     access_type: String(payload.access_type || "free"),
     status: "active",

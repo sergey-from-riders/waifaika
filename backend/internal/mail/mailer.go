@@ -4,7 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/smtp"
+	"strings"
+	"sync"
+	"time"
 )
 
 type Message struct {
@@ -27,7 +31,12 @@ type SMTPMailer struct {
 	FromName string
 }
 
-func (m SMTPMailer) Send(_ context.Context, msg Message) error {
+func (m SMTPMailer) Send(ctx context.Context, msg Message) error {
+	for _, header := range []string{m.From, m.FromName, msg.To, msg.Subject} {
+		if strings.ContainsAny(header, "\r\n") {
+			return fmt.Errorf("invalid mail header")
+		}
+	}
 	addr := fmt.Sprintf("%s:%d", m.Host, m.Port)
 	auth := smtp.PlainAuth("", m.Username, m.Password, m.Host)
 	body := "MIME-Version: 1.0\r\n" +
@@ -37,11 +46,19 @@ func (m SMTPMailer) Send(_ context.Context, msg Message) error {
 		fmt.Sprintf("Subject: %s\r\n\r\n", msg.Subject) +
 		msg.HTML
 
-	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: m.Host, MinVersion: tls.VersionTLS12})
+	dialer := &tls.Dialer{NetDialer: &net.Dialer{Timeout: 10 * time.Second}, Config: &tls.Config{ServerName: m.Host, MinVersion: tls.VersionTLS12}}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
+	deadline := time.Now().Add(20 * time.Second)
+	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+		deadline = d
+	}
+	if err := conn.SetDeadline(deadline); err != nil {
+		return err
+	}
 
 	client, err := smtp.NewClient(conn, m.Host)
 	if err != nil {
@@ -75,10 +92,19 @@ func (m SMTPMailer) Send(_ context.Context, msg Message) error {
 }
 
 type MemoryMailer struct {
+	mu       sync.Mutex
 	Messages []Message
 }
 
 func (m *MemoryMailer) Send(_ context.Context, msg Message) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.Messages = append(m.Messages, msg)
 	return nil
+}
+
+type UnavailableMailer struct{}
+
+func (UnavailableMailer) Send(context.Context, Message) error {
+	return fmt.Errorf("SMTP is not configured")
 }

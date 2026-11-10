@@ -54,12 +54,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer index.Close()
-		stat, _ := index.Stat()
+		applyCacheHeaders(w, "/index.html")
+		stat, statErr := index.Stat()
+		if statErr != nil {
+			http.NotFound(w, r)
+			return
+		}
 		http.ServeContent(w, r, "index.html", stat.ModTime(), seekable(index))
 		return
 	}
 	defer file.Close()
-	stat, _ := file.Stat()
+	stat, statErr := file.Stat()
+	if statErr != nil || stat.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
 	http.ServeContent(w, r, stat.Name(), stat.ModTime(), seekable(file))
 }
 
@@ -78,7 +87,7 @@ func applyCacheHeaders(w http.ResponseWriter, path string) {
 	switch {
 	case strings.HasPrefix(path, "/assets/"):
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	case path == "/sw.js":
+	case path == "/sw.js" || path == "/asset-manifest.json":
 		w.Header().Set("Cache-Control", "no-cache")
 	case path == "/manifest.webmanifest" || path == "/index.html" || path == "/":
 		w.Header().Set("Cache-Control", "no-cache")

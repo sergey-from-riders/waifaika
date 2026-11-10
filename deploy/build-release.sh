@@ -9,15 +9,15 @@ DIST_DIR="$ROOT/dist"
 OPENAPI_SOURCE="$ROOT/docs/openapi.yaml"
 OPENAPI_PUBLIC="$WEB_DIR/public/openapi.yaml"
 GO_BIN="${GO_BIN:-/usr/local/go/bin/go}"
-GO_TOOLCHAIN="${GO_TOOLCHAIN:-go1.25.8+auto}"
+GO_TOOLCHAIN="${GO_TOOLCHAIN:-go1.26.10+auto}"
 
-. "$HOME/.nvm/nvm.sh"
+if [[ -f "$HOME/.nvm/nvm.sh" ]]; then . "$HOME/.nvm/nvm.sh"; fi
 
 mkdir -p "$DIST_DIR"
 cp "$OPENAPI_SOURCE" "$OPENAPI_PUBLIC"
 
 cd "$WEB_DIR"
-npm install
+npm ci
 npm run build
 
 rm -rf "$STATIC_EMBED_DIR"

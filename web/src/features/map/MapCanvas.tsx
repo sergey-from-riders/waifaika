@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl, { Marker, type Map } from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import { Marker, type Map } from "maplibre-gl";
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { FileSource, PMTiles, Protocol } from "pmtiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -22,6 +24,9 @@ type MapCanvasProps = {
 };
 
 const pmtilesProtocol = new Protocol();
+// MapLibre 6 ships a separate module worker. Include it in Vite's asset manifest
+// so the service worker precaches it with the map library for offline restarts.
+maplibregl.setWorkerUrl(workerUrl);
 let protocolRegistered = false;
 
 function ensureProtocol() {
